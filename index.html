@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Generador de cartas de aceptación de prácticas profesionales ISND con folio, marca de agua y QR único."
+    />
+    <meta name="theme-color" content="#f05a28" />
+    <title>Generador de carta de aceptación | ISND</title>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+    <style>
+:root {
+  --orange: #f05a28;
+  --orange-dark: #c83f16;
+  --ink: #17212b;
+  --muted: #64717d;
+  --line: #dfe4e8;
+  --soft: #f5f7f8;
+  --success: #177245;
+  --shadow: 0 22px 60px rgba(23, 33, 43, 0.12);
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at 88% 7%, rgba(240, 90, 40, 0.09), transparent 23rem),
+    #f7f8f9;
+  color: var(--ink);
+}
+
+button, input { font: inherit; }
+button { cursor: pointer; }
+
+.topbar {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px clamp(20px, 5vw, 72px);
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand-mark {
+  width: 52px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px 9px 18px 9px;
+  background: var(--orange);
+  color: white;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.brand strong, .brand small { display: block; }
+.brand strong { font-size: 0.95rem; }
+.brand small { margin-top: 2px; color: var(--muted); font-size: 0.76rem; }
+
+.status-pill, .approved-badge, .secure-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.status-pill {
+  padding: 9px 13px;
+  color: #4c5964;
+  background: #f2f4f5;
+  border: 1px solid var(--line);
+}
+
+.status-pill i { width: 7px; height: 7px; border-radius: 50%; background: #1d9b5f; }
+
+.shell { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 54px 0 40px; }
+
+.intro-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  align-items: end;
+  gap: clamp(30px, 6vw, 88px);
+  margin-bottom: 42px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--orange-dark);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.15em;
+}
+
+h1, h2, h3, p { margin-top: 0; }
+h1 { max-width: 760px; margin-bottom: 16px; font-size: clamp(2.25rem, 5.2vw, 4.9rem); line-height: 0.98; letter-spacing: -0.055em; }
+.intro-copy > p:last-child { max-width: 690px; margin-bottom: 0; color: var(--muted); font-size: 1.04rem; line-height: 1.65; }
+
+.search-card {
+  padding: 24px;
+  background: white;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--orange);
+  border-radius: 16px;
+  box-shadow: 0 15px 42px rgba(23, 33, 43, 0.08);
+}
+
+.search-card > label { display: block; margin-bottom: 10px; font-size: 0.82rem; font-weight: 800; }
+.search-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.search-row input {
+  min-width: 0;
+  padding: 14px 15px;
+  color: var(--ink);
+  background: #fbfcfc;
+  border: 1px solid #cdd4d9;
+  border-radius: 9px;
+  outline: none;
+}
+.search-row input:focus { border-color: var(--orange); box-shadow: 0 0 0 4px rgba(240, 90, 40, 0.12); }
+.search-row button, .primary-action {
+  border: 0;
+  border-radius: 9px;
+  background: var(--orange);
+  color: white;
+  font-weight: 800;
+  transition: transform 150ms ease, background 150ms ease;
+}
+.search-row button { padding: 0 22px; }
+.search-row button:hover, .primary-action:hover { background: var(--orange-dark); transform: translateY(-1px); }
+
+.search-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; color: var(--muted); font-size: 0.76rem; }
+.text-button { padding: 0; color: var(--orange-dark); background: none; border: 0; font-weight: 800; text-decoration: underline; }
+.secure-label { padding: 4px 8px; color: var(--success); background: #edf8f2; }
+.error-message { margin: 12px 0 0; color: #b42318; font-size: 0.82rem; font-weight: 700; }
+
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 28px; align-items: start; }
+.document-column, .side-panel, .history-section, .implementation-note, .verification-panel {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+.document-column { padding: clamp(18px, 3vw, 30px); }
+.section-heading { display: flex; justify-content: space-between; align-items: end; gap: 20px; margin-bottom: 20px; }
+.section-heading h2 { margin-bottom: 0; font-size: 1.45rem; letter-spacing: -0.025em; }
+.approved-badge { padding: 7px 11px; color: var(--success); background: #eaf7f0; }
+
+.paper {
+  position: relative;
+  width: min(100%, 720px);
+  min-height: 932px;
+  margin: 0 auto;
+  padding: clamp(36px, 7vw, 72px);
+  background: #fff;
+  border: 1px solid #d9dde0;
+  box-shadow: var(--shadow);
+  font-family: Arial, sans-serif;
+  font-size: clamp(0.72rem, 1.3vw, 0.88rem);
+  line-height: 1.45;
+}
+
+.paper::after {
+  content: "DOCUMENTO IDENTIFICADO";
+  position: absolute;
+  inset: 48% auto auto 50%;
+  color: rgba(23, 33, 43, 0.045);
+  font-size: clamp(2rem, 6vw, 4rem);
+  font-weight: 900;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-48deg);
+  pointer-events: none;
+}
+
+.letterhead { min-height: 72px; display: flex; justify-content: space-between; gap: 20px; border-bottom: 2px solid var(--orange); }
+.letterhead span { color: #a4abb0; font-size: 0.66rem; letter-spacing: 0.11em; }
+.letterhead strong { max-width: 50%; text-align: right; font-size: 0.9rem; }
+.date-line { margin: 20px 0 52px; text-align: right; }
+.recipient { margin-bottom: 38px; }
+.paper p { text-align: justify; }
+.paper ol { margin: 14px 0 24px; padding-left: 28px; }
+.paper li { margin-bottom: 5px; }
+.classification-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 26px; }
+.classification-grid div { padding: 10px; border: 1px solid #9ca5ab; }
+.classification-grid small, .classification-grid strong { display: block; }
+.classification-grid small { color: var(--muted); font-size: 0.63rem; text-transform: uppercase; }
+.classification-grid strong { margin-top: 3px; }
+.signature-block { width: 72%; margin: 70px auto 0; text-align: center; }
+.signature-block span { display: block; border-top: 1px solid var(--ink); }
+.signature-block strong, .signature-block small { display: block; }
+.signature-block strong { margin-top: 7px; }
+.signature-block small { margin-top: 4px; color: var(--muted); }
+
+.side-panel { position: sticky; top: 22px; padding: 22px; }
+.student-card { display: flex; gap: 13px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.student-avatar { width: 48px; height: 48px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 13px; background: #fff0e9; color: var(--orange-dark); font-weight: 900; }
+.student-card small { color: var(--muted); }
+.student-card h3 { margin: 3px 0; font-size: 1rem; }
+.student-card p { margin-bottom: 0; color: var(--muted); font-size: 0.75rem; }
+.summary-list { margin: 8px 0 20px; }
+.summary-list div { display: grid; grid-template-columns: 92px 1fr; gap: 10px; padding: 12px 0; border-bottom: 1px solid #edf0f2; }
+.summary-list dt { color: var(--muted); font-size: 0.75rem; }
+.summary-list dd { margin: 0; font-size: 0.8rem; font-weight: 750; text-align: right; }
+.primary-action { width: 100%; padding: 14px 16px; text-align: left; }
+.primary-action span, .primary-action small { display: block; }
+.primary-action small { margin-top: 3px; opacity: 0.78; font-size: 0.7rem; font-weight: 600; }
+.primary-action:disabled { opacity: 0.62; cursor: wait; transform: none; }
+.download-status { min-height: 20px; margin: 10px 0 0; color: var(--success); font-size: 0.76rem; font-weight: 750; }
+.security-card { display: flex; gap: 12px; margin-top: 17px; padding: 14px; background: var(--soft); border: 1px solid var(--line); border-radius: 12px; }
+.security-icon { width: 36px; height: 36px; flex: 0 0 auto; display: grid; place-items: center; background: var(--ink); color: white; font-size: 0.72rem; font-weight: 900; border-radius: 8px; }
+.security-card strong { font-size: 0.8rem; }
+.security-card p { margin: 4px 0 0; color: var(--muted); font-size: 0.72rem; line-height: 1.45; }
+
+.history-section { margin-top: 28px; padding: clamp(18px, 3vw, 28px); }
+.secondary-button { padding: 8px 12px; color: #53616c; background: white; border: 1px solid var(--line); border-radius: 8px; font-size: 0.75rem; font-weight: 750; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.empty-state { margin: 0; padding: 28px 16px; color: var(--muted); text-align: center; }
+.implementation-note { display: flex; gap: 22px; margin-top: 20px; padding: 18px 22px; border-left: 4px solid var(--orange); }
+.implementation-note strong { flex: 0 0 auto; }
+.implementation-note p { margin: 0; color: var(--muted); font-size: 0.82rem; line-height: 1.55; }
+
+.verification-panel { margin-bottom: 26px; padding: 20px 22px; border-left: 4px solid var(--success); }
+.verification-panel.invalid { border-left-color: #b42318; }
+.verification-panel h2 { margin-bottom: 6px; font-size: 1.1rem; }
+.verification-panel p { margin-bottom: 0; color: var(--muted); font-size: 0.82rem; }
+.verification-details { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 12px; font-size: 0.76rem; }
+.verification-details strong { margin-right: 5px; }
+
+footer { display: flex; justify-content: space-between; gap: 20px; padding: 24px clamp(20px, 5vw, 72px); color: #7a858e; font-size: 0.73rem; }
+.qr-generator { position: fixed; left: -9999px; top: -9999px; width: 220px; height: 220px; }
+[hidden] { display: none !important; }
+
+@media (max-width: 980px) {
+  .intro-grid, .workspace { grid-template-columns: 1fr; }
+  .side-panel { position: static; }
+  .paper { min-height: 0; }
+}
+
+@media (max-width: 620px) {
+  .status-pill { display: none; }
+  .shell { width: min(100% - 24px, 1320px); padding-top: 34px; }
+  .search-row { grid-template-columns: 1fr; }
+  .search-row button { min-height: 48px; }
+  .search-meta, .implementation-note, footer { flex-direction: column; }
+  .paper { padding: 32px 24px; }
+  .letterhead { flex-direction: column; gap: 5px; }
+  .letterhead strong { max-width: none; text-align: left; }
+  .classification-grid { grid-template-columns: 1fr; }
+  .signature-block { width: 92%; }
+}
+
+@media print {
+  .topbar, .intro-grid, .side-panel, .history-section, .implementation-note, footer { display: none; }
+  body, .shell, .document-column { background: white; padding: 0; margin: 0; border: 0; }
+  .section-heading { display: none; }
+  .workspace, .paper { display: block !important; box-shadow: none; border: 0; }
+}
+
+    </style>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Inicio">
+        <span class="brand-mark" aria-hidden="true">ISND</span>
+        <span>
+          <strong>Prácticas Profesionales</strong>
+          <small>Sistemas y Negocios Digitales</small>
+        </span>
+      </a>
+      <span class="status-pill"><i></i> Generador de documentos</span>
+    </header>
+
+    <main class="shell">
+      <section id="verificationPanel" class="verification-panel" hidden aria-live="polite"></section>
+
+      <section class="intro-grid">
+        <div class="intro-copy">
+          <p class="eyebrow">CARTA DE ACEPTACIÓN</p>
+          <h1>Genera el documento con identificación única.</h1>
+          <p>
+            Ingresa el ID del alumno para consultar su información, revisar la carta y descargarla
+            en PDF con folio, marca de agua y código QR.
+          </p>
+        </div>
+
+        <form id="searchForm" class="search-card" novalidate>
+          <label for="studentId">ID del alumno</label>
+          <div class="search-row">
+            <input
+              id="studentId"
+              name="studentId"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="Ej. 23477"
+              aria-describedby="searchHelp searchError"
+              required
+            />
+            <button type="submit">Consultar</button>
+          </div>
+          <div class="search-meta">
+            <span id="searchHelp">ID de demostración: <button class="text-button" type="button" data-demo-id="23477">23477</button></span>
+            <span class="secure-label">Consulta local</span>
+          </div>
+          <p id="searchError" class="error-message" role="alert" hidden></p>
+        </form>
+      </section>
+
+      <section id="resultSection" class="workspace" hidden aria-live="polite">
+        <div class="document-column">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">VISTA PREVIA</p>
+              <h2>Carta de aceptación</h2>
+            </div>
+            <span id="eligibilityBadge" class="approved-badge">Disponible</span>
+          </div>
+
+          <article id="documentPreview" class="paper" aria-label="Vista previa del documento">
+            <div class="letterhead">
+              <span>PAPEL MEMBRETADO DE LA EMPRESA</span>
+              <strong data-field="companyName"></strong>
+            </div>
+            <p class="date-line"><span data-field="place"></span>, <span data-field="startDateLong"></span></p>
+
+            <div class="recipient">
+              <strong>Mtro. Alexandro Barrón Guajardo</strong><br />
+              <strong>Coordinador de Ingeniería en Sistemas y Negocios Digitales</strong><br /><br />
+              PRESENTE:
+            </div>
+
+            <p>
+              Por medio de la presente, hago constar que el alumno
+              <strong data-field="studentName"></strong>, con ID <strong data-field="studentId"></strong>,
+              ha sido aceptado para realizar sus prácticas profesionales en esta organización. Las
+              actividades que desempeñará serán las siguientes:
+            </p>
+
+            <ol id="previewActivities"></ol>
+
+            <p>
+              Su horario de actividades será de las <strong data-field="scheduleStart"></strong> a las
+              <strong data-field="scheduleEnd"></strong> horas, los días <strong data-field="days"></strong>.
+              Sus actividades serán supervisadas por <strong data-field="supervisor"></strong>, quien ocupa
+              el puesto de <strong data-field="supervisorRole"></strong>.
+            </p>
+
+            <p>
+              Durante el periodo de prácticas profesionales del alumno en la organización, se
+              realizarán las evaluaciones parcial y final, de acuerdo con los periodos de evaluación
+              establecidos por el Instituto.
+            </p>
+
+            <div class="classification-grid">
+              <div><small>Giro</small><strong data-field="businessSector"></strong></div>
+              <div><small>Tipo</small><strong data-field="organizationType"></strong></div>
+              <div><small>Tamaño</small><strong data-field="companySize"></strong></div>
+            </div>
+
+            <div class="signature-block">
+              <span></span>
+              <strong data-field="director"></strong>
+              <small>Nombre y firma del directivo que autoriza las prácticas profesionales</small>
+            </div>
+          </article>
+        </div>
+
+        <aside class="side-panel">
+          <div class="student-card">
+            <div class="student-avatar" data-field="initials"></div>
+            <div>
+              <small>Alumno encontrado</small>
+              <h3 data-field="studentName"></h3>
+              <p>ID <span data-field="studentId"></span> · <span data-field="program"></span></p>
+            </div>
+          </div>
+
+          <dl class="summary-list">
+            <div><dt>Empresa</dt><dd data-field="companyName"></dd></div>
+            <div><dt>Inicio</dt><dd data-field="startDate"></dd></div>
+            <div><dt>Supervisor</dt><dd data-field="supervisor"></dd></div>
+            <div><dt>Documento</dt><dd>PDF tamaño carta</dd></div>
+          </dl>
+
+          <button id="downloadButton" class="primary-action" type="button">
+            <span>Descargar carta identificada</span>
+            <small>Genera un folio y QR nuevos</small>
+          </button>
+          <p id="downloadStatus" class="download-status" aria-live="polite"></p>
+
+          <div class="security-card">
+            <div class="security-icon" aria-hidden="true">QR</div>
+            <div>
+              <strong>Identificación por descarga</strong>
+              <p>El PDF incluirá un folio, marca de agua, sello de integridad y QR verificable.</p>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="history-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">CONTROL LOCAL</p>
+            <h2>Descargas recientes</h2>
+          </div>
+          <button id="clearHistoryButton" class="secondary-button" type="button">Limpiar historial</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Folio</th><th>ID</th><th>Alumno</th><th>Fecha y hora</th><th>Sello</th></tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+          <p id="emptyHistory" class="empty-state">Todavía no se ha descargado ningún documento en este dispositivo.</p>
+        </div>
+      </section>
+
+      <section class="implementation-note">
+        <strong>Nota para producción</strong>
+        <p>
+          Esta versión para GitHub Pages genera identificadores únicos en el navegador. Para una
+          validación institucional contra falsificaciones, conecta el folio a Google Apps Script,
+          Supabase u otra base de datos privada.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <span>ISND · Prácticas Profesionales</span>
+      <span>Documento electrónico con identificación única</span>
+    </footer>
+
+    <div id="qrGenerator" class="qr-generator" aria-hidden="true"></div>
+    <script>
+"use strict";
+
+const STUDENTS = {
+  "23477": {
+    id: "23477",
+    name: "Prueba Probando",
+    program: "ISND",
+    companyName: "Empresa Demo del Golfo, S.A. de C.V.",
+    place: "Altamira, Tamaulipas",
+    startDate: "2026-09-01",
+    scheduleStart: "09:00",
+    scheduleEnd: "14:00",
+    days: "lunes a viernes",
+    supervisor: "Ing. Andrea Morales",
+    supervisorRole: "Líder de Proyectos Digitales",
+    director: "Lic. Roberto Martínez",
+    businessSector: "Servicios",
+    organizationType: "Privada",
+    companySize: "Mediana",
+    eligible: true,
+    activities: [
+      "Apoyo en el levantamiento y análisis de requerimientos.",
+      "Desarrollo y documentación de soluciones digitales.",
+      "Seguimiento de pruebas, incidencias y entregables del proyecto."
+    ]
+  }
+};
+
+const HISTORY_KEY = "isnd_acceptance_downloads_v1";
+const state = { student: null };
+
+const byId = (id) => document.getElementById(id);
+const searchForm = byId("searchForm");
+const studentIdInput = byId("studentId");
+const searchError = byId("searchError");
+const resultSection = byId("resultSection");
+const downloadButton = byId("downloadButton");
+const downloadStatus = byId("downloadStatus");
+const historyBody = byId("historyBody");
+const emptyHistory = byId("emptyHistory");
+const qrGenerator = byId("qrGenerator");
+
+function normalizeId(value) {
+  return String(value || "").trim().replace(/\D/g, "");
+}
+
+function dateFromISO(value) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatDate(value, long = false) {
+  const date = value instanceof Date ? value : dateFromISO(value);
+  return new Intl.DateTimeFormat("es-MX", long
+    ? { day: "numeric", month: "long", year: "numeric" }
+    : { day: "2-digit", month: "short", year: "numeric" }
+  ).format(date);
+}
+
+function formatDateTime(value) {
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
+function initials(name) {
+  return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+}
+
+function setFields(name, value) {
+  document.querySelectorAll(`[data-field="${name}"]`).forEach((element) => {
+    element.textContent = value;
+  });
+}
+
+function showStudent(student) {
+  state.student = student;
+  searchError.hidden = true;
+  setFields("studentName", student.name);
+  setFields("studentId", student.id);
+  setFields("program", student.program);
+  setFields("initials", initials(student.name));
+  setFields("companyName", student.companyName);
+  setFields("place", student.place);
+  setFields("startDate", formatDate(student.startDate));
+  setFields("startDateLong", formatDate(student.startDate, true));
+  setFields("scheduleStart", student.scheduleStart);
+  setFields("scheduleEnd", student.scheduleEnd);
+  setFields("days", student.days);
+  setFields("supervisor", student.supervisor);
+  setFields("supervisorRole", student.supervisorRole);
+  setFields("director", student.director);
+  setFields("businessSector", student.businessSector);
+  setFields("organizationType", student.organizationType);
+  setFields("companySize", student.companySize);
+
+  const activities = byId("previewActivities");
+  activities.replaceChildren(...student.activities.map((activity) => {
+    const item = document.createElement("li");
+    item.textContent = activity;
+    return item;
+  }));
+
+  byId("eligibilityBadge").textContent = student.eligible ? "Disponible" : "No disponible";
+  downloadButton.disabled = !student.eligible;
+  resultSection.hidden = false;
+  downloadStatus.textContent = "";
+  resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function searchStudent(rawId) {
+  const id = normalizeId(rawId);
+  if (!id) {
+    searchError.textContent = "Ingresa el ID del alumno.";
+    searchError.hidden = false;
+    resultSection.hidden = true;
+    return;
+  }
+  const student = STUDENTS[id];
+  if (!student) {
+    searchError.textContent = `No se encontró información para el ID ${id}. Usa 23477 para probar la demo.`;
+    searchError.hidden = false;
+    resultSection.hidden = true;
+    return;
+  }
+  showStudent(student);
+}
+
+function randomCode(length = 6) {
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (value) => (value % 36).toString(36)).join("").toUpperCase();
+}
+
+function stablePayload(issuance) {
+  return [
+    issuance.folio,
+    issuance.studentId,
+    issuance.studentName,
+    issuance.companyName,
+    issuance.issuedAt
+  ].join("|");
+}
+
+async function sha256(text) {
+  const data = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function encodeToken(data) {
+  const bytes = new TextEncoder().encode(JSON.stringify(data));
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function decodeToken(token) {
+  const normalized = token.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function makeVerificationUrl(issuance) {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("verificar", encodeToken(issuance));
+  return url.toString();
+}
+
+async function makeQrDataUrl(text) {
+  if (typeof QRCode === "undefined") throw new Error("No se pudo cargar el generador de QR.");
+  qrGenerator.replaceChildren();
+  new QRCode(qrGenerator, {
+    text,
+    width: 220,
+    height: 220,
+    colorDark: "#17212b",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const canvas = qrGenerator.querySelector("canvas");
+  const image = qrGenerator.querySelector("img");
+  if (canvas) return canvas.toDataURL("image/png");
+  if (image?.src) return image.src;
+  throw new Error("No fue posible generar el código QR.");
+}
+
+function addWrappedText(doc, text, x, y, width, options = {}) {
+  const lines = doc.splitTextToSize(text, width);
+  doc.text(lines, x, y, options);
+  return y + lines.length * 5.2;
+}
+
+function createPdf(student, issuance, qrDataUrl) {
+  if (!window.jspdf?.jsPDF) throw new Error("No se pudo cargar el generador de PDF.");
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 23;
+  const contentWidth = pageWidth - margin * 2;
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 36, 41);
+  doc.setFontSize(10);
+  doc.text(student.companyName.toUpperCase(), margin, 20);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(150, 156, 161);
+  doc.setFontSize(7.5);
+  doc.text("PAPEL MEMBRETADO DE LA EMPRESA", margin, 26);
+  doc.setDrawColor(240, 90, 40);
+  doc.setLineWidth(0.7);
+  doc.line(margin, 31, pageWidth - margin, 31);
+
+  doc.setTextColor(30, 36, 41);
+  doc.setFontSize(9.5);
+  doc.text(`${student.place}, ${formatDate(student.startDate, true)}`, pageWidth - margin, 43, { align: "right" });
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Mtro. Alexandro Barrón Guajardo", margin, 59);
+  doc.text("Coordinador de Ingeniería en Sistemas y Negocios Digitales", margin, 64);
+  doc.setFont("helvetica", "normal");
+  doc.text("PRESENTE:", margin, 72);
+
+  let y = 87;
+  doc.setFontSize(9.5);
+  const intro = `Por medio de la presente, hago constar que el alumno ${student.name}, con ID ${student.id}, ha sido aceptado para realizar sus prácticas profesionales en esta organización. Las actividades que desempeñará serán las siguientes:`;
+  y = addWrappedText(doc, intro, margin, y, contentWidth, { align: "justify", maxWidth: contentWidth }) + 3;
+
+  student.activities.forEach((activity, index) => {
+    doc.setFont("helvetica", "bold");
+    doc.text(`${index + 1}.`, margin + 5, y);
+    doc.setFont("helvetica", "normal");
+    y = addWrappedText(doc, activity, margin + 13, y, contentWidth - 18) + 1.5;
+  });
+
+  y += 4;
+  const schedule = `Su horario de actividades será de las ${student.scheduleStart} a las ${student.scheduleEnd} horas, los días ${student.days}. Sus actividades serán supervisadas por ${student.supervisor}, quien ocupa el puesto de ${student.supervisorRole}.`;
+  y = addWrappedText(doc, schedule, margin, y, contentWidth, { align: "justify", maxWidth: contentWidth }) + 7;
+
+  const evaluation = "Durante el periodo de prácticas profesionales del alumno en la organización, se realizarán las evaluaciones parcial y final, de acuerdo con los periodos de evaluación establecidos por el Instituto.";
+  y = addWrappedText(doc, evaluation, margin, y, contentWidth, { align: "justify", maxWidth: contentWidth }) + 7;
+
+  const boxGap = 3;
+  const boxWidth = (contentWidth - boxGap * 2) / 3;
+  const boxData = [
+    ["GIRO", student.businessSector],
+    ["TIPO DE ORGANIZACIÓN", student.organizationType],
+    ["TAMAÑO", student.companySize]
+  ];
+  boxData.forEach(([label, value], index) => {
+    const x = margin + index * (boxWidth + boxGap);
+    doc.setDrawColor(150, 158, 164);
+    doc.setLineWidth(0.25);
+    doc.rect(x, y, boxWidth, 15);
+    doc.setTextColor(100, 110, 118);
+    doc.setFontSize(6.5);
+    doc.text(label, x + 3, y + 5);
+    doc.setTextColor(30, 36, 41);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(value, x + 3, y + 11);
+    doc.setFont("helvetica", "normal");
+  });
+
+  const signatureY = Math.max(y + 43, 215);
+  doc.setDrawColor(30, 36, 41);
+  doc.line(margin + 24, signatureY, pageWidth - margin - 40, signatureY);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text(student.director, (pageWidth - 16) / 2, signatureY + 6, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.2);
+  doc.text("Nombre y firma del directivo que autoriza las prácticas profesionales", (pageWidth - 16) / 2, signatureY + 11, { align: "center" });
+
+  doc.setTextColor(228, 230, 232);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(28);
+  doc.text(`FOLIO ${issuance.folio}`, pageWidth / 2, pageHeight / 2 + 12, { align: "center", angle: 45 });
+
+  doc.addImage(qrDataUrl, "PNG", pageWidth - margin - 27, pageHeight - 45, 25, 25);
+  doc.setTextColor(30, 36, 41);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.7);
+  doc.text(issuance.folio, margin, pageHeight - 22);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(100, 110, 118);
+  doc.text(`Emitido: ${formatDateTime(issuance.issuedAt)} · Sello: ${issuance.seal}`, margin, pageHeight - 17);
+  doc.text("Escanee el QR para consultar los datos de identificación del documento.", margin, pageHeight - 12);
+
+  doc.setProperties({
+    title: `Carta de aceptación ${student.id}`,
+    subject: `Prácticas profesionales ISND · ${issuance.folio}`,
+    author: "Coordinación ISND",
+    keywords: `ISND, prácticas profesionales, ${issuance.folio}`
+  });
+
+  doc.save(`Carta_aceptacion_${student.id}_${issuance.folio}.pdf`);
+}
+
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }
+  catch { return []; }
+}
+
+function saveHistory(issuance) {
+  const history = [issuance, ...getHistory().filter((item) => item.folio !== issuance.folio)].slice(0, 20);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  renderHistory();
+}
+
+function renderHistory() {
+  const history = getHistory();
+  historyBody.replaceChildren(...history.map((item) => {
+    const row = document.createElement("tr");
+    [item.folio, item.studentId, item.studentName, formatDateTime(item.issuedAt), item.seal].forEach((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    return row;
+  }));
+  emptyHistory.hidden = history.length > 0;
+}
+
+async function downloadDocument() {
+  const student = state.student;
+  if (!student || !student.eligible) return;
+  downloadButton.disabled = true;
+  downloadStatus.textContent = "Generando folio y código QR…";
+  try {
+    const now = new Date();
+    const issuance = {
+      folio: `ISND-AC-${now.getFullYear()}-${student.id}-${randomCode()}`,
+      studentId: student.id,
+      studentName: student.name,
+      companyName: student.companyName,
+      issuedAt: now.toISOString()
+    };
+    issuance.seal = (await sha256(stablePayload(issuance))).slice(0, 16).toUpperCase();
+    const qrDataUrl = await makeQrDataUrl(makeVerificationUrl(issuance));
+    createPdf(student, issuance, qrDataUrl);
+    saveHistory(issuance);
+    downloadStatus.textContent = `Documento generado: ${issuance.folio}`;
+  } catch (error) {
+    downloadStatus.textContent = error.message || "No fue posible generar el documento.";
+  } finally {
+    downloadButton.disabled = false;
+  }
+}
+
+async function showVerificationFromUrl() {
+  const token = new URLSearchParams(window.location.search).get("verificar");
+  if (!token) return;
+  const panel = byId("verificationPanel");
+  panel.hidden = false;
+  try {
+    const issuance = decodeToken(token);
+    const expectedSeal = (await sha256(stablePayload(issuance))).slice(0, 16).toUpperCase();
+    const structurallyValid = expectedSeal === issuance.seal;
+    const localMatch = getHistory().some((item) => item.folio === issuance.folio && item.seal === issuance.seal);
+    panel.classList.toggle("invalid", !structurallyValid);
+    panel.innerHTML = `
+      <h2>${structurallyValid ? "Identificación del documento válida" : "No fue posible validar el documento"}</h2>
+      <p>${localMatch ? "El folio coincide con el registro guardado en este dispositivo." : "El QR conserva íntegros los datos de identificación. La confirmación institucional requiere una base de datos conectada."}</p>
+      <div class="verification-details">
+        <span><strong>Folio:</strong>${escapeHtml(issuance.folio)}</span>
+        <span><strong>ID:</strong>${escapeHtml(issuance.studentId)}</span>
+        <span><strong>Alumno:</strong>${escapeHtml(issuance.studentName)}</span>
+        <span><strong>Emisión:</strong>${escapeHtml(formatDateTime(issuance.issuedAt))}</span>
+        <span><strong>Sello:</strong>${escapeHtml(issuance.seal)}</span>
+      </div>`;
+  } catch {
+    panel.classList.add("invalid");
+    panel.innerHTML = "<h2>QR no válido</h2><p>El identificador está incompleto o fue modificado.</p>";
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>'"]/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
+  })[char]);
+}
+
+searchForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  searchStudent(studentIdInput.value);
+});
+
+document.querySelectorAll("[data-demo-id]").forEach((button) => {
+  button.addEventListener("click", () => {
+    studentIdInput.value = button.dataset.demoId;
+    searchStudent(button.dataset.demoId);
+  });
+});
+
+downloadButton.addEventListener("click", downloadDocument);
+byId("clearHistoryButton").addEventListener("click", () => {
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+});
+
+renderHistory();
+showVerificationFromUrl();
+
+    </script>
+  </body>
+</html>
+
