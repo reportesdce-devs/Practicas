@@ -7,15 +7,20 @@ import AppLayout from './layouts/AppLayout'
 import DocumentosPage from './pages/alumno/DocumentosPage'
 import FormularioDocumentoPage from './pages/alumno/FormularioDocumentoPage'
 import LoginPage from './pages/LoginPage'
+import EmpresaPage from './pages/empresa/EmpresaPage'
 import SolicitudesPage from './pages/coordinador/SolicitudesPage'
+import RoleSelectorPage from './pages/rol/RoleSelectorPage'
 
 function App() {
   return (
     <ErrorBoundary>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/empresa/completar" element={<EmpresaPage />} />
 
         <Route element={<RequireAuth />}>
+          <Route path="/elegir-portal" element={<RoleSelectorPage />} />
+
           <Route element={<AppLayout />}>
             <Route path="/" element={<RoleRedirect />} />
 

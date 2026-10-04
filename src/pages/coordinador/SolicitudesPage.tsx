@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { DOCUMENTOS, etiquetaDocumento, ordenDocumento } from '../../lib/documentos'
+import { cartaCompletadaPorEmpresa, correoSupervisorDeCarta } from '../../lib/empresa'
+import { invitarEmpresa } from '../../lib/empresaApi'
 import {
   cambiarEstadoProceso,
   listarProcesos,
@@ -11,10 +13,16 @@ import type { DatosDocumentoGuardados } from '../../lib/schemas/documento'
 
 type FiltroEstado = EstadoProceso | 'todas'
 
-const ESTILOS_ESTADO: Record<EstadoProceso, string> = {
-  pendiente: 'bg-amber-100 text-amber-800',
-  aceptada: 'bg-green-100 text-green-800',
-  rechazada: 'bg-red-100 text-red-800',
+const ESTILOS_BADGE: Record<EstadoProceso, string> = {
+  pendiente: 'b-pendiente',
+  aceptada: 'b-atendido',
+  rechazada: 'b-rechazada',
+}
+
+const ETIQUETAS_ESTADO: Record<EstadoProceso, string> = {
+  pendiente: 'Pendiente',
+  aceptada: 'Aceptada',
+  rechazada: 'Rechazada',
 }
 
 const FILTROS: { valor: FiltroEstado; etiqueta: string }[] = [
@@ -48,70 +56,67 @@ function claveCarrera(proceso: ProcesoConDocumentos): string {
 
 function Dato({ label, valor }: { label: string; valor?: string | null }) {
   return (
-    <div>
-      <dt className="text-xs text-gray-500">{label}</dt>
-      <dd className="text-sm font-semibold text-slate-900">{valor || '—'}</dd>
+    <div className="form-group">
+      <span
+        className="field-hint"
+        style={{
+          fontSize: '0.62rem',
+          fontWeight: 900,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </span>
+      <span style={{ fontWeight: 700, color: 'var(--ink)' }}>{valor || '—'}</span>
     </div>
   )
 }
 
 function BadgeEstado({ estado }: { estado: EstadoProceso }) {
-  const etiqueta = estado.charAt(0).toUpperCase() + estado.slice(1)
-  return (
-    <span
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${ESTILOS_ESTADO[estado]}`}
-    >
-      {etiqueta}
-    </span>
-  )
+  return <span className={`badge ${ESTILOS_BADGE[estado]}`}>{ETIQUETAS_ESTADO[estado]}</span>
 }
 
 function SeccionesDatos({ datos }: { datos: Partial<DatosDocumentoGuardados> }) {
   return (
     <>
-      <section className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
-        <h3 className="font-semibold">Empresa</h3>
-        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Dato label="Empresa" valor={datos.empresa} />
-          <Dato label="Lugar" valor={datos.lugar} />
-          <Dato label="Giro" valor={datos.giro} />
-          <Dato label="Tipo de organización" valor={datos.tipoOrganizacion} />
-          <Dato label="Tamaño" valor={datos.tamano} />
-        </dl>
-      </section>
+      <div className="form-section-label">Empresa</div>
+      <div className="form-row">
+        <Dato label="Empresa" valor={datos.empresa} />
+        <Dato label="Lugar" valor={datos.lugar} />
+        <Dato label="Giro" valor={datos.giro} />
+        <Dato label="Tipo de organización" valor={datos.tipoOrganizacion} />
+        <Dato label="Tamaño" valor={datos.tamano} />
+      </div>
 
-      <section className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
-        <h3 className="font-semibold">Fechas y horario</h3>
-        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Dato
-            label="Fecha de inicio"
-            valor={datos.fechaInicio ? formatearFecha(datos.fechaInicio) : null}
-          />
-          <Dato label="Días" valor={datos.dias} />
-          <Dato label="Horario" valor={`${datos.horarioInicio ?? '—'} a ${datos.horarioFin ?? '—'}`} />
-        </dl>
-      </section>
+      <div className="form-section-label">Fechas y horario</div>
+      <div className="form-row">
+        <Dato
+          label="Fecha de inicio"
+          valor={datos.fechaInicio ? formatearFecha(datos.fechaInicio) : null}
+        />
+        <Dato label="Días" valor={datos.dias} />
+        <Dato label="Horario" valor={`${datos.horarioInicio ?? '—'} a ${datos.horarioFin ?? '—'}`} />
+      </div>
 
-      <section className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
-        <h3 className="font-semibold">Supervisión y autorización</h3>
-        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Dato label="Supervisor" valor={datos.supervisor} />
-          <Dato label="Puesto del supervisor" valor={datos.puestoSupervisor} />
-          <Dato label="Directivo que autoriza" valor={datos.directivo} />
-        </dl>
-      </section>
+      <div className="form-section-label">Supervisión y autorización</div>
+      <div className="form-row">
+        <Dato label="Supervisor" valor={datos.supervisor} />
+        <Dato label="Puesto del supervisor" valor={datos.puestoSupervisor} />
+        <Dato label="Directivo que autoriza" valor={datos.directivo} />
+      </div>
 
-      <section className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
-        <h3 className="font-semibold">Actividades</h3>
-        <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-gray-700">
-          {(datos.actividades ?? []).map((actividad, index) => (
-            <li key={index}>{actividad}</li>
-          ))}
-          {(datos.actividades ?? []).length === 0 && (
-            <li className="list-none pl-0 text-gray-400">Sin actividades registradas</li>
-          )}
-        </ol>
-      </section>
+      <div className="form-section-label">Actividades</div>
+      <ol className="form-group" style={{ marginTop: 6, paddingLeft: 20 }}>
+        {(datos.actividades ?? []).map((actividad, index) => (
+          <li key={index} style={{ fontSize: '0.85rem' }}>
+            {actividad}
+          </li>
+        ))}
+        {(datos.actividades ?? []).length === 0 && (
+          <li style={{ color: 'var(--muted)' }}>Sin actividades registradas</li>
+        )}
+      </ol>
     </>
   )
 }
@@ -123,6 +128,8 @@ export default function SolicitudesPage() {
   const [busqueda, setBusqueda] = useState('')
   const [seleccionada, setSeleccionada] = useState<ProcesoConDocumentos | null>(null)
   const [accionPendiente, setAccionPendiente] = useState<number | null>(null)
+  const [invitePendiente, setInvitePendiente] = useState(false)
+  const [avisoEmpresa, setAvisoEmpresa] = useState<string | null>(null)
   const [errorAccion, setErrorAccion] = useState<string | null>(null)
 
   const {
@@ -163,7 +170,13 @@ export default function SolicitudesPage() {
           normalizar(etiquetaDocumento(solicitud.documento)).includes(consulta) ||
           normalizar(solicitud.documento).includes(consulta),
       )
-      return nombre.includes(consulta) || correo.includes(consulta) || id.includes(consulta) || folio.includes(consulta) || documentos
+      return (
+        nombre.includes(consulta) ||
+        correo.includes(consulta) ||
+        id.includes(consulta) ||
+        folio.includes(consulta) ||
+        documentos
+      )
     })
   }, [porCarrera, busqueda])
 
@@ -196,6 +209,26 @@ export default function SolicitudesPage() {
     }
   }
 
+  async function manejarInvitacion(proceso: ProcesoConDocumentos, reenviar: boolean) {
+    setInvitePendiente(true)
+    setErrorAccion(null)
+    setAvisoEmpresa(null)
+    try {
+      const expira = await invitarEmpresa(proceso.id, reenviar)
+      setAvisoEmpresa(
+        `Enlace ${reenviar ? 'reenviado' : 'enviado'} a la empresa. Vence el ${formatearFecha(expira)}.`,
+      )
+      await queryClient.invalidateQueries({ queryKey: ['procesos'] })
+      const frescos = queryClient.getQueryData<ProcesoConDocumentos[]>(['procesos'])
+      const actualizado = frescos?.find((item) => item.id === proceso.id)
+      if (actualizado) setSeleccionada(actualizado)
+    } catch (err) {
+      setErrorAccion(err instanceof Error ? err.message : 'No se pudo enviar el enlace a la empresa')
+    } finally {
+      setInvitePendiente(false)
+    }
+  }
+
   if (seleccionada) {
     const carrera = seleccionada.personas?.carreras
     const resuelta = seleccionada.estado !== 'pendiente'
@@ -203,98 +236,209 @@ export default function SolicitudesPage() {
       (a, b) => ordenDocumento(a.documento) - ordenDocumento(b.documento),
     )
     const completos = documentos.length >= DOCUMENTOS.length
+    const carta = documentos.find((solicitud) => solicitud.documento === 'carta_aceptacion')
+    const cartaLista = carta ? cartaCompletadaPorEmpresa(carta.datos) : false
+    const correoEmpresa = carta ? correoSupervisorDeCarta(carta.datos) : null
+    const puedeAceptar = completos && cartaLista
+    const empresaExpirada =
+      !cartaLista &&
+      Boolean(seleccionada.empresa_expira_en) &&
+      Number.isFinite(Date.parse(String(seleccionada.empresa_expira_en))) &&
+      Date.parse(String(seleccionada.empresa_expira_en)) <= Date.now()
+    const estadoEmpresa = cartaLista
+      ? 'Completada'
+      : empresaExpirada
+        ? 'Expirada'
+        : seleccionada.empresa_estado === 'enviada'
+          ? 'Enviada'
+          : 'Sin enviar'
     const faltantes = DOCUMENTOS.filter(
       (doc) => !documentos.some((solicitud) => solicitud.documento === doc.codigo),
     )
 
     return (
-      <div className="mx-auto max-w-3xl">
-        <button
-          type="button"
-          onClick={() => {
-            setSeleccionada(null)
-            setErrorAccion(null)
-          }}
-          className="text-sm font-semibold text-brand-dark"
-        >
-          ← Volver a la lista
-        </button>
-
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold">Proceso de prácticas</h1>
-          <span className="rounded-full border border-gray-300 bg-gray-50 px-3 py-1 font-mono text-sm font-bold text-slate-800">
-            {seleccionada.folio}
-          </span>
-          <BadgeEstado estado={seleccionada.estado} />
+      <div>
+        <div className="top">
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => {
+              setSeleccionada(null)
+              setErrorAccion(null)
+              setAvisoEmpresa(null)
+            }}
+          >
+            <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+            Volver a la lista
+          </button>
+          <div className="head-meta">
+            <span className="tag">
+              <i className="fa-solid fa-hashtag" aria-hidden="true" />
+              <span style={{ fontFamily: 'var(--font-mono)' }}>{seleccionada.folio}</span>
+            </span>
+            <BadgeEstado estado={seleccionada.estado} />
+          </div>
         </div>
-        <p className="mt-1 text-sm text-gray-500">
-          Periodo {seleccionada.periodo} · abierto el {formatearFecha(seleccionada.creado_en)}
-        </p>
 
-        <section className="mt-5 rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="font-semibold">Alumno</h2>
-          <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="head-row">
+          <div className="head-icon">
+            <i className="fa-solid fa-user-graduate" aria-hidden="true" />
+          </div>
+          <div className="head-text">
+            <h1>Proceso de prácticas</h1>
+            <span className="head-sub">
+              Periodo {seleccionada.periodo} · abierto el {formatearFecha(seleccionada.creado_en)}
+            </span>
+          </div>
+        </div>
+
+        <section className="card card-pad" style={{ marginTop: 16 }}>
+          <div className="form-card-head">
+            <h2>Alumno</h2>
+          </div>
+          <div className="form-row">
             <Dato label="Nombre" valor={seleccionada.personas?.nombre} />
             <Dato label="ID" valor={seleccionada.alumno_id} />
             <Dato label="Carrera" valor={carrera ? carrera.nombre : '—'} />
             <Dato label="Correo" valor={seleccionada.personas?.correo} />
-          </dl>
+          </div>
         </section>
 
         {documentos.map((solicitud) => (
-          <div key={solicitud.id} className="mt-6">
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-lg font-bold">{etiquetaDocumento(solicitud.documento)}</h2>
-              <span className="text-sm text-gray-500">
-                enviada el {formatearFecha(solicitud.creado_en)}
-              </span>
+          <section key={solicitud.id} className="card card-pad" style={{ marginTop: 14 }}>
+            <div className="form-card-head">
+              <h2>{etiquetaDocumento(solicitud.documento)}</h2>
+              <span className="meta-date">Enviada el {formatearFecha(solicitud.creado_en)}</span>
             </div>
             <SeccionesDatos datos={solicitud.datos as Partial<DatosDocumentoGuardados>} />
-          </div>
+          </section>
         ))}
 
         {faltantes.length > 0 && (
-          <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
-            Faltan {faltantes.length} documento(s): {faltantes.map((doc) => doc.titulo).join(', ')}.
-            El alumno puede seguir agregándolos.
-          </p>
+          <div className="alert alert-warn" style={{ marginTop: 14 }}>
+            <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+            <span>
+              Faltan {faltantes.length} documento(s): {faltantes.map((doc) => doc.titulo).join(', ')}.
+              El alumno puede seguir agregándolos.
+            </span>
+          </div>
         )}
 
-        {!resuelta && (
-          <section className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
-            <h2 className="font-semibold">Acciones</h2>
-            <p className="mt-1 text-xs text-gray-500">
-              Al aceptar o rechazar, el resultado se aplica a los {DOCUMENTOS.length} documentos del
-              alumno en este periodo.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-3">
+        <section className="card card-pad" style={{ marginTop: 14 }}>
+          <div className="form-card-head">
+            <h2>Empresa</h2>
+            <span className="meta-date">{estadoEmpresa}</span>
+          </div>
+          <div className="form-row">
+            <Dato label="Correo del supervisor" valor={correoEmpresa ?? seleccionada.empresa_correo} />
+            <Dato
+              label="Vence el enlace"
+              valor={seleccionada.empresa_expira_en ? formatearFecha(seleccionada.empresa_expira_en) : null}
+            />
+            <Dato
+              label="Completada"
+              valor={seleccionada.empresa_completada_en ? formatearFecha(seleccionada.empresa_completada_en) : null}
+            />
+          </div>
+          {!resuelta && carta && !cartaLista && (
+            <div className="field" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button
                 type="button"
-                onClick={() => void manejarAccion(seleccionada, 'aceptada')}
-                disabled={accionPendiente !== null || !completos}
-                className="rounded-lg bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-60"
+                className="btn btn-primary"
+                onClick={() => void manejarInvitacion(seleccionada, false)}
+                disabled={invitePendiente || !correoEmpresa}
               >
-                {accionPendiente === seleccionada.id ? 'Procesando…' : 'Aceptar proceso'}
+                {invitePendiente ? (
+                  <>
+                    <span className="spinner" aria-hidden="true" />
+                    Enviando…
+                  </>
+                ) : (
+                  <>
+                    <i className="fa-solid fa-paper-plane" aria-hidden="true" />
+                    Confirmar y enviar a empresa
+                  </>
+                )}
+              </button>
+              {seleccionada.empresa_estado === 'enviada' && (
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => void manejarInvitacion(seleccionada, true)}
+                  disabled={invitePendiente || !correoEmpresa}
+                >
+                  <i className="fa-solid fa-rotate-right" aria-hidden="true" />
+                  Reenviar enlace
+                </button>
+              )}
+            </div>
+          )}
+          {!resuelta && (
+            <p className="quiet" style={{ fontSize: '0.8rem', marginBottom: 0 }}>
+              La confirmación solo envía el enlace temporal a la empresa; no acepta el proceso.
+            </p>
+          )}
+          {avisoEmpresa && (
+            <div className="alert alert-ok" style={{ marginTop: 12 }}>
+              <i className="fa-solid fa-circle-check" aria-hidden="true" />
+              <span>{avisoEmpresa}</span>
+            </div>
+          )}
+        </section>
+
+        {!resuelta && (
+          <section className="card card-pad" style={{ marginTop: 14 }}>
+            <div className="form-card-head">
+              <h2>Acciones</h2>
+            </div>
+            <p className="quiet" style={{ fontSize: '0.82rem' }}>
+              Al aceptar o rechazar, el resultado se aplica a los {DOCUMENTOS.length} documentos
+              del alumno en este periodo.
+            </p>
+            <div className="field" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-ok"
+                onClick={() => void manejarAccion(seleccionada, 'aceptada')}
+                disabled={accionPendiente !== null || !puedeAceptar}
+              >
+                {accionPendiente === seleccionada.id ? (
+                  <>
+                    <span className="spinner" aria-hidden="true" />
+                    Procesando…
+                  </>
+                ) : (
+                  <>
+                    <i className="fa-solid fa-check" aria-hidden="true" />
+                    Aceptar proceso
+                  </>
+                )}
               </button>
               <button
                 type="button"
+                className="btn btn-danger-solid"
                 onClick={() => void manejarAccion(seleccionada, 'rechazada')}
                 disabled={accionPendiente !== null}
-                className="rounded-lg border border-red-300 px-5 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60"
               >
+                <i className="fa-solid fa-xmark" aria-hidden="true" />
                 Rechazar proceso
               </button>
             </div>
-            {!completos && (
-              <p className="mt-3 text-xs font-semibold text-amber-700">
-                Para aceptar se requieren los {DOCUMENTOS.length} documentos. Faltan{' '}
-                {DOCUMENTOS.length - documentos.length}.
-              </p>
+            {!puedeAceptar && (
+              <div className="alert alert-warn" style={{ marginTop: 14 }}>
+                <i className="fa-solid fa-circle-info" aria-hidden="true" />
+                <span>
+                  Para aceptar se requieren los {DOCUMENTOS.length} documentos y la carta completada
+                  por la empresa. Faltan {DOCUMENTOS.length - documentos.length} documento(s)
+                  {!cartaLista ? ' y la carta de la empresa' : ''}.
+                </span>
+              </div>
             )}
             {errorAccion && (
-              <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
-                {errorAccion}
-              </p>
+              <div className="error">
+                <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
+                <span>{errorAccion}</span>
+              </div>
             )}
           </section>
         )}
@@ -304,140 +448,147 @@ export default function SolicitudesPage() {
 
   return (
     <div>
-      <p className="text-xs font-bold uppercase tracking-widest text-brand-dark">
-        Panel del coordinador
-      </p>
-      <h1 className="mt-1 text-2xl font-bold">Procesos de prácticas</h1>
-
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          {FILTROS.map((filtro) => {
-            const activo = filtroEstado === filtro.valor
-            return (
-              <button
-                key={filtro.valor}
-                type="button"
-                onClick={() => setFiltroEstado(filtro.valor)}
-                className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
-                  activo
-                    ? 'border-brand bg-brand text-white'
-                    : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {filtro.etiqueta} ({conteos[filtro.valor]})
-              </button>
-            )
-          })}
+      <div className="top">
+        <div className="head-row">
+          <div className="head-icon">
+            <i className="fa-solid fa-clipboard-list" aria-hidden="true" />
+          </div>
+          <div className="head-text">
+            <h1>Procesos de prácticas</h1>
+            <span className="head-sub">Panel del coordinador</span>
+          </div>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="search"
-            value={busqueda}
-            onChange={(evento) => setBusqueda(evento.target.value)}
-            placeholder="Buscar por nombre, correo, ID, folio o documento…"
-            aria-label="Buscar alumno"
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-          />
-          <select
-            value={filtroCarrera}
-            onChange={(evento) => setFiltroCarrera(evento.target.value)}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-          >
-            <option value="todas">Todas las carreras</option>
-            {carreras.map(([clave, nombre]) => (
-              <option key={clave} value={clave}>
-                {nombre}
-              </option>
-            ))}
-          </select>
+        <div className="head-meta">
+          <span className="meta-date">{procesos?.length ?? 0} procesos</span>
         </div>
       </div>
 
+      <div className="filters">
+        <input
+          type="search"
+          value={busqueda}
+          onChange={(evento) => setBusqueda(evento.target.value)}
+          placeholder="Buscar por nombre, correo, ID, folio o documento…"
+          aria-label="Buscar alumno"
+        />
+        <select value={filtroCarrera} onChange={(evento) => setFiltroCarrera(evento.target.value)}>
+          <option value="todas">Todas las carreras</option>
+          {carreras.map(([clave, nombre]) => (
+            <option key={clave} value={clave}>
+              {nombre}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="seg-control" style={{ marginBottom: 16 }}>
+        {FILTROS.map((filtro) => {
+          const activo = filtroEstado === filtro.valor
+          return (
+            <button
+              key={filtro.valor}
+              type="button"
+              className={`seg${activo ? ' active' : ''}`}
+              onClick={() => setFiltroEstado(filtro.valor)}
+            >
+              {filtro.etiqueta} ({conteos[filtro.valor]})
+            </button>
+          )
+        })}
+      </div>
+
       {isLoading && (
-        <p className="mt-8 flex items-center gap-3 text-sm text-gray-500">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-brand" />
-          Cargando procesos…
-        </p>
+        <div className="alert alert-info">
+          <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" />
+          <span>Cargando procesos…</span>
+        </div>
       )}
 
       {error && (
-        <div className="mt-8 rounded-xl border border-red-200 bg-white p-6 text-center">
-          <p className="text-sm font-semibold text-red-700">No se pudieron cargar los procesos.</p>
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            className="mt-3 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-          >
+        <div className="card card-pad">
+          <div className="error" style={{ marginBottom: 0 }}>
+            <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
+            <span>No se pudieron cargar los procesos.</span>
+          </div>
+          <button type="button" className="btn" onClick={() => void refetch()}>
+            <i className="fa-solid fa-rotate-right" aria-hidden="true" />
             Reintentar
           </button>
         </div>
       )}
 
       {!isLoading && !error && (procesos ?? []).length === 0 && (
-        <div className="mt-8 rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-400 shadow-sm">
-          Todavía no se han abierto procesos de prácticas.
+        <div className="card">
+          <div className="empty-state">
+            <i className="fa-solid fa-inbox" aria-hidden="true" />
+            <strong>Todavía no se han abierto procesos</strong>
+            <span>Cuando un alumno solicite su carta de aceptación aparecerá aquí.</span>
+          </div>
         </div>
       )}
 
       {!isLoading && !error && (procesos ?? []).length > 0 && filtradas.length === 0 && (
-        <div className="mt-8 rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-400 shadow-sm">
-          No hay procesos que coincidan con los filtros seleccionados.
+        <div className="card">
+          <div className="empty-state">
+            <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
+            <strong>Sin resultados</strong>
+            <span>No hay procesos que coincidan con los filtros seleccionados.</span>
+          </div>
         </div>
       )}
 
       {!isLoading && !error && filtradas.length > 0 && (
-        <div className="mt-5 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table className="w-full text-sm">
+        <div className="table-wrap">
+          <table>
             <thead>
-              <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
-                <th className="px-4 py-3 font-bold">Folio</th>
-                <th className="px-4 py-3 font-bold">Alumno</th>
-                <th className="px-4 py-3 font-bold">Carrera</th>
-                <th className="px-4 py-3 font-bold">Documentos</th>
-                <th className="px-4 py-3 font-bold">Fecha</th>
-                <th className="px-4 py-3 font-bold">Estado</th>
-                <th className="px-4 py-3" />
+              <tr>
+                <th>Folio</th>
+                <th>Alumno</th>
+                <th>Carrera</th>
+                <th>Documentos</th>
+                <th>Fecha</th>
+                <th>Estado</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {filtradas.map((proceso) => {
                 const carrera = proceso.personas?.carreras
                 return (
-                  <tr key={proceso.id} className="border-b border-gray-100 last:border-0">
-                    <td className="px-4 py-3 font-mono text-xs font-bold text-slate-800">
-                      {proceso.folio}
+                  <tr key={proceso.id}>
+                    <td data-label="Folio">
+                      <span className="td-folio">{proceso.folio}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <strong className="block font-semibold text-slate-900">
-                        {proceso.personas?.nombre ?? '—'}
-                      </strong>
-                      <span className="text-xs text-gray-500">
+                    <td data-label="Alumno">
+                      <span className="td-id">{proceso.personas?.nombre ?? '—'}</span>
+                      <span className="td-fecha">
                         ID {proceso.alumno_id}
                         {proceso.personas?.correo ? ` · ${proceso.personas.correo}` : ''}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td data-label="Carrera">
                       {carrera ? carrera.sigla || carrera.nombre : '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td data-label="Documentos">
                       {proceso.solicitudes.length}/{DOCUMENTOS.length}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {formatearFecha(proceso.creado_en)}
+                    <td data-label="Fecha">
+                      <span className="td-fecha">{formatearFecha(proceso.creado_en)}</span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td data-label="Estado">
                       <BadgeEstado estado={proceso.estado} />
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td>
                       <button
                         type="button"
+                        className="row-btn row-edit"
                         onClick={() => {
                           setSeleccionada(proceso)
                           setErrorAccion(null)
+                          setAvisoEmpresa(null)
                         }}
-                        className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-50"
                       >
+                        <i className="fa-solid fa-eye" aria-hidden="true" />
                         Ver detalle
                       </button>
                     </td>

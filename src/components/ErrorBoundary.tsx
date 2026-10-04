@@ -29,37 +29,42 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (!error) return this.props.children
 
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-5">
-        <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-          <span className="mx-auto grid h-11 w-[56px] place-items-center rounded-lg bg-brand text-sm font-black text-white">
-            ISND
-          </span>
-          <h1 className="mt-4 text-lg font-bold text-red-700">Algo salió mal</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Ocurrió un error inesperado. Puedes intentar de nuevo o recargar la página.
-          </p>
-          <p className="mt-3 break-words rounded-lg bg-gray-50 px-3 py-2 text-left text-xs text-gray-500">
-            {error.message}
-          </p>
-          <div className="mt-5 flex justify-center gap-3">
-            <button
-              type="button"
-              onClick={this.reiniciar}
-              className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
-            >
-              Reintentar
-            </button>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              Recargar
-            </button>
+      <div className="gate-shell">
+        <div className="app">
+          <div className="card gate-card">
+            <div className="gate-head">
+              <img className="gate-logo" src="/logo-dce.png" alt="Logo de Ingenierías" />
+            </div>
+            <div className="gate-body">
+              <div className="gate-title" style={{ marginBottom: 14 }}>
+                <h1>Algo salió mal</h1>
+                <p>Prácticas profesionales</p>
+              </div>
+              <div className="alert alert-danger">
+                <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+                <span>Ocurrió un error inesperado. Puedes intentar de nuevo o recargar la página.</span>
+              </div>
+              <p
+                className="error"
+                style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)' }}
+              >
+                {error.message}
+              </p>
+              <div className="field" style={{ display: 'flex', gap: 10 }}>
+                <button type="button" className="btn btn-primary" onClick={this.reiniciar}>
+                  <i className="fa-solid fa-rotate-right" aria-hidden="true" />
+                  Reintentar
+                </button>
+                <button type="button" className="btn" onClick={() => window.location.reload()}>
+                  <i className="fa-solid fa-arrows-rotate" aria-hidden="true" />
+                  Recargar
+                </button>
+              </div>
+              <Link to="/" className="btn btn-ghost btn-block" style={{ marginTop: 12 }}>
+                Ir al inicio
+              </Link>
+            </div>
           </div>
-          <Link to="/" className="mt-4 block text-xs text-gray-400 hover:text-gray-600">
-            Ir al inicio
-          </Link>
         </div>
       </div>
     )

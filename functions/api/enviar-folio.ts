@@ -101,20 +101,21 @@ function correoAlumno(datos: {
   coordinadores: string[]
 }): Pick<OpcionesCorreo, 'subject' | 'htmlContent' | 'textContent'> {
   const encabezado = `<p>Hola ${escapar(datos.nombre)},</p>
-<p>Se abrió tu <strong>proceso de prácticas</strong> del periodo <strong>${escapar(datos.periodo)}</strong>.</p>
+<p>Recibimos tu <strong>solicitud de carta de aceptación</strong> del periodo <strong>${escapar(datos.periodo)}</strong>. Está <strong>pendiente de confirmación por la coordinación</strong>; todavía no está aceptada.</p>
 <p style="font-size:24px;font-weight:bold;color:#f05a28;text-align:center;letter-spacing:3px;border:2px solid #f05a28;border-radius:8px;padding:16px;margin:16px 0;">${datos.folio}</p>
-<p>Guarda este código: la coordinación lo usará para identificar tu proceso. Ya tienes <strong>1 de 3 documentos</strong> (carta de aceptación); después faltan avance y cierre.</p>
+<p>Guarda este código: la coordinación lo usará para identificar tu proceso. Después de la confirmación, la empresa completará los datos faltantes y podrás solicitar avance y cierre.</p>
 ${datos.coordinadores.length > 0 ? `<p>Dudas con la coordinación: ${datos.coordinadores.map(escapar).join(', ')}</p>` : ''}
 <p>— ISND · Prácticas Profesionales</p>`
 
   const texto = `Hola ${datos.nombre},
 
-Se abrió tu proceso de prácticas del periodo ${datos.periodo}.
+Recibimos tu solicitud de carta de aceptación del periodo ${datos.periodo}.
+Está pendiente de confirmación por la coordinación; todavía no está aceptada.
 
 FOLIO: ${datos.folio}
 
 Guarda este código: la coordinación lo usará para identificar tu proceso.
-Ya tienes 1 de 3 documentos (carta de aceptación); después faltan avance y cierre.${
+Después de la confirmación, la empresa completará los datos faltantes y podrás solicitar avance y cierre.${
     datos.coordinadores.length > 0 ? `\n\nDudas con la coordinación: ${datos.coordinadores.join(', ')}` : ''
   }
 
@@ -203,26 +204,26 @@ export const onRequestPost = async ({ request, env }: Contexto): Promise<Respons
       await enviarBrevo(env, {
         to: coordinadores.map((persona) => ({ email: persona.correo, name: persona.nombre })),
         replyTo: alumno.correo,
-        subject: `Nuevo proceso de prácticas: ${alumno.nombre} (${folio})`,
-        htmlContent: `<p>Se abrió un <strong>nuevo proceso de prácticas</strong>.</p>
+        subject: `Nueva carta por confirmar: ${alumno.nombre} (${folio})`,
+        htmlContent: `<p>Se recibió una <strong>solicitud de carta de aceptación</strong> pendiente de confirmación.</p>
 <table cellpadding="6" style="border-collapse:collapse">
 <tr><td><strong>Alumno</strong></td><td>${escapar(alumno.nombre)}</td></tr>
 <tr><td><strong>Carrera</strong></td><td>${escapar(carrera)}</td></tr>
 <tr><td><strong>Periodo</strong></td><td>${escapar(proceso.periodo)}</td></tr>
 <tr><td><strong>Folio</strong></td><td style="color:#f05a28;font-weight:bold">${folio}</td></tr>
-<tr><td><strong>Documentos</strong></td><td>1 de 3 (carta de aceptación enviada)</td></tr>
+<tr><td><strong>Documentos</strong></td><td>Carta mínima recibida; falta confirmación y datos de la empresa</td></tr>
 </table>
-<p>Responder a este correo notifica al alumno.${env.APP_URL ? ` Revisa el panel: <a href="${escapar(env.APP_URL)}">${escapar(env.APP_URL)}</a>` : ''}</p>
+<p>Confirma en el panel para enviar el enlace temporal a la empresa.${env.APP_URL ? ` Revisa el panel: <a href="${escapar(env.APP_URL)}">${escapar(env.APP_URL)}</a>` : ''}</p>
 <p>— ISND · Prácticas Profesionales</p>`,
-        textContent: `Se abrió un nuevo proceso de prácticas.
+        textContent: `Se recibió una solicitud de carta de aceptación pendiente de confirmación.
 
 Alumno: ${alumno.nombre}
 Carrera: ${carrera}
 Periodo: ${proceso.periodo}
 Folio: ${folio}
-Documentos: 1 de 3 (carta de aceptación enviada)
+Documentos: Carta mínima recibida; falta confirmación y datos de la empresa
 
-Responder a este correo notifica al alumno.${enlace}
+Confirma en el panel para enviar el enlace temporal a la empresa.${enlace}
 
 — ISND · Prácticas Profesionales`,
       })

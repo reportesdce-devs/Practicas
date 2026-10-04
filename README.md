@@ -17,6 +17,10 @@ revisa y aprueba desde un panel.
   ago–dic = `YYYY-2`) que agrupa sus 3 documentos bajo un folio `XXXX-XXXX-XXXX`.
 - **Flujo**: primero la carta de aceptación → luego avance y cierre → la
   coordinación acepta solo con los 3 documentos (1/3, 2/3 → solo rechazo).
+- **Carta con empresa**: el alumno registra empresa/lugar, supervisor (nombre,
+  puesto y correo) y actividades; la coordinación confirma y envía un enlace
+  temporal a la empresa, que completa giro, tamaño, fechas, horarios y
+  directivo. Avance/cierre se desbloquean con la carta completa.
 - **Panel del coordinador**: lista de procesos, búsqueda por nombre/correo/folio,
   detalle por documento y estados pendiente/aceptada/rechazada.
 
@@ -67,6 +71,7 @@ que el orden alfabético NO sirve):
 | 3 | `20260927_personas_rls_hardening.sql` | Cierra lectura anónima de `personas`; helper `es_admin_o_coordinador()` |
 | 4 | `20260927_create_procesos.sql` | Tabla `procesos`, liga `solicitudes.proceso_id`, backfill, RLS |
 | 5 | `20260927_rls_insert_hardening.sql` | Endurece INSERT (periodo/estado/folio/documento/tamaño) |
+| 6 | `20260930_empresa_flujo.sql` | Invitaciones de empresa, estado empresa en `procesos`, backfill de cartas completas y RLS (avance/cierre solo con carta completa) |
 
 **Reglas del SQL Editor de Supabase**: ejecuta *statement por statement* en
 conexiones separadas y **continúa aunque un statement falle**. Por eso las
@@ -161,10 +166,11 @@ src/
 ├── context/           # AuthContext + AuthProvider (sesión y perfil)
 ├── layouts/           # AppLayout (header/footer)
 ├── lib/               # supabase client, types, procesos, solicitudes, documentos, schemas/
-├── pages/             # LoginPage, alumno/, coordinador/
+├── pages/             # LoginPage, alumno/, coordinador/, empresa/ (enlace temporal público)
 ├── App.tsx            # rutas + ErrorBoundary
 └── main.tsx           # proveedores (Query, Auth, Router)
 supabase/migrations/   # migraciones SQL versionadas
+functions/api/         # enviar-folio, empresa-invitar, empresa (enlace temporal)
 legacy/                # demo anterior (HTML plano con jsPDF)
 ```
 

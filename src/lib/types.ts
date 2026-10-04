@@ -15,9 +15,14 @@ export type Persona = {
 
 export type Role = 'alumno' | 'coordinador'
 
+export function rolesOf(profile: Persona | null): Role[] {
+  if (!profile) return []
+  const roles: Role[] = []
+  if (profile.rol === 'admin' || profile.rol === 'coordinador') roles.push('coordinador')
+  if (profile.tipo === 'Alumno') roles.push('alumno')
+  return roles
+}
+
 export function roleOf(profile: Persona | null): Role | null {
-  if (!profile) return null
-  if (profile.rol === 'admin' || profile.rol === 'coordinador') return 'coordinador'
-  if (profile.tipo === 'Alumno') return 'alumno'
-  return null
+  return rolesOf(profile)[0] ?? null
 }

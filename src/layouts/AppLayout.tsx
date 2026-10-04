@@ -1,56 +1,75 @@
-import { Link, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { roleOf } from '../lib/types'
+import { limpiarPortal, portalGuardado } from '../lib/portal'
+import { rolesOf } from '../lib/types'
 
 export default function AppLayout() {
   const { profile, signOut } = useAuth()
-  const rol = roleOf(profile)
+  const navigate = useNavigate()
+  const roles = rolesOf(profile)
+  const multiRol = roles.length > 1
+  const activo = multiRol ? (portalGuardado() ?? roles[0]) : roles[0]
+  const inicial = profile?.nombre?.trim().charAt(0).toUpperCase() ?? '?'
+
+  const nav =
+    activo === 'coordinador'
+      ? [{ to: '/coordinador', icono: 'fa-solid fa-clipboard-list', etiqueta: 'Procesos' }]
+      : [{ to: '/alumno/documentos', icono: 'fa-solid fa-folder-open', etiqueta: 'Mis documentos' }]
+
+  function cambiarPortal() {
+    limpiarPortal()
+    navigate('/elegir-portal', { replace: true })
+  }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b border-gray-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-6 px-5 py-3">
-          <Link to="/" className="flex items-center gap-3">
-            <span className="grid h-10 w-[52px] place-items-center rounded-lg bg-brand text-sm font-black text-white">
-              ISND
-            </span>
-            <span>
-              <strong className="block text-sm">Prácticas Profesionales</strong>
-              <small className="block text-xs text-gray-500">
-                Sistemas y Negocios Digitales
-              </small>
-            </span>
-          </Link>
+    <div className="layout">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <img className="sidebar-logo" src="/logo-dce.png" alt="Logo de Ingenierías" />
+        </div>
 
-          <div className="flex items-center gap-4">
-            <div className="hidden text-right sm:block">
-              <strong className="block text-sm">{profile?.nombre}</strong>
-              <small className="text-xs text-gray-500">
-                {rol === 'coordinador' ? 'Coordinación' : 'Alumno'}
-                {profile?.carreras?.sigla ? ` · ${profile.carreras.sigla}` : ''}
-              </small>
-            </div>
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
+        <nav className="sidebar-nav">
+          {nav.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => `tab${isActive ? ' active' : ''}`}
             >
-              Cerrar sesión
+              <i className={item.icono} aria-hidden="true" />
+              {item.etiqueta}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="sidebar-foot">
+          {multiRol && (
+            <button type="button" className="sidebar-portal" onClick={cambiarPortal}>
+              <i className="fa-solid fa-right-left" aria-hidden="true" />
+              Cambiar de portal
             </button>
+          )}
+          <div className="session-id">
+            <span className="avatar">{inicial}</span>
+            <span className="id-txt">
+              <span className="id-mail">{profile?.nombre ?? 'Usuario'}</span>
+              <span className="id-rol">
+                {activo === 'coordinador' ? 'Coordinación' : 'Alumno'}
+                {profile?.carreras?.sigla ? ` · ${profile.carreras.sigla}` : ''}
+              </span>
+            </span>
           </div>
+          <button type="button" className="sidebar-logout" onClick={() => void signOut()}>
+            <i className="fa-solid fa-arrow-right-from-bracket" aria-hidden="true" />
+            Salir
+          </button>
         </div>
-      </header>
+      </aside>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8">
-        <Outlet />
+      <main className="content">
+        <div className="app">
+          <Outlet />
+        </div>
       </main>
-
-      <footer className="border-t border-gray-200 bg-white">
-        <div className="mx-auto flex w-full max-w-6xl justify-between gap-4 px-5 py-4 text-xs text-gray-500">
-          <span>ISND · Prácticas Profesionales</span>
-          <span>Sistema de solicitudes de documentos</span>
-        </div>
-      </footer>
     </div>
   )
 }

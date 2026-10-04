@@ -1,4 +1,5 @@
 import type { DatosDocumentoGuardados } from './schemas/documento'
+import { cartaCompletadaPorEmpresa } from './empresa'
 import { buscarProcesoPeriodo, crearProceso, type Proceso } from './procesos'
 import { supabase } from './supabase'
 
@@ -24,7 +25,18 @@ export async function buscarDocumento(
 
 async function procesoParaSolicitud(alumnoId: string, documento: string): Promise<Proceso> {
   const proceso = await buscarProcesoPeriodo(alumnoId)
-  if (proceso?.estado === 'pendiente') return proceso
+  if (proceso?.estado === 'pendiente') {
+    if (documento !== 'carta_aceptacion') {
+      const carta = await buscarDocumento(proceso.id, 'carta_aceptacion')
+      if (!carta) {
+        throw new Error('Primero solicita la carta de aceptación para abrir un proceso.')
+      }
+      if (!cartaCompletadaPorEmpresa(carta.datos)) {
+        throw new Error('La carta debe ser completada por la empresa antes de solicitar avance o cierre.')
+      }
+    }
+    return proceso
+  }
   if (proceso?.estado === 'aceptada') {
     throw new Error('Tu proceso de este periodo ya fue aceptado; no puedes agregar documentos.')
   }

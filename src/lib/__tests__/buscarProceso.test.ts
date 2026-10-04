@@ -17,6 +17,10 @@ const vigente: Proceso = {
   periodo: '2026-1',
   estado: 'pendiente',
   creado_en: '2026-09-01T00:00:00Z',
+  empresa_correo: null,
+  empresa_estado: 'no_enviada',
+  empresa_expira_en: null,
+  empresa_completada_en: null,
 }
 
 const respaldo: Proceso = {
@@ -26,6 +30,10 @@ const respaldo: Proceso = {
   periodo: '2026-1',
   estado: 'rechazada',
   creado_en: '2026-08-01T00:00:00Z',
+  empresa_correo: null,
+  empresa_estado: 'no_enviada',
+  empresa_expira_en: null,
+  empresa_completada_en: null,
 }
 
 function pruebasComunes(buscar: (alumnoId: string) => Promise<unknown>): void {

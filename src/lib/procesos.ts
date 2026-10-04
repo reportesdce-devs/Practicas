@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { EstadoEmpresa } from './empresa'
 
 export type EstadoProceso = 'pendiente' | 'aceptada' | 'rechazada'
 
@@ -9,6 +10,10 @@ export interface Proceso {
   periodo: string
   estado: EstadoProceso
   creado_en: string
+  empresa_correo: string | null
+  empresa_estado: EstadoEmpresa
+  empresa_expira_en: string | null
+  empresa_completada_en: string | null
 }
 
 export interface SolicitudResumen {
@@ -27,7 +32,8 @@ export interface ProcesoConDocumentos extends Proceso {
   solicitudes: SolicitudResumen[]
 }
 
-const SELECT_PROCESO = 'id, folio, alumno_id, periodo, estado, creado_en'
+const SELECT_PROCESO =
+  'id, folio, alumno_id, periodo, estado, creado_en, empresa_correo, empresa_estado, empresa_expira_en, empresa_completada_en'
 
 export function periodoActual(): string {
   const ahora = new Date()

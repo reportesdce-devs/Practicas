@@ -8,11 +8,15 @@ import { useAuth } from '../../context/AuthContext'
 import type { CodigoDocumento } from '../../lib/documentos'
 import { avisarNuevoProceso } from '../../lib/notificaciones'
 import { buscarProcesoPeriodo } from '../../lib/procesos'
+import { cartaCompletadaPorEmpresa, type EstadoEmpresa } from '../../lib/empresa'
 import {
   datosDocumentoDefault,
   datosDocumentoSchema,
+  solicitudCartaAlumnoDefault,
+  solicitudCartaAlumnoSchema,
   type DatosDocumento,
   type DatosDocumentoGuardados,
+  type SolicitudCartaAlumno,
 } from '../../lib/schemas/documento'
 import { buscarDocumento, crearSolicitud } from '../../lib/solicitudes'
 import type { Persona } from '../../lib/types'
@@ -20,6 +24,73 @@ import type { Persona } from '../../lib/types'
 type Estado = 'cargando' | 'no-disponible' | 'libre' | 'pendiente' | 'aceptada' | 'enviada'
 
 const FECHAS_EDITABLES = ['fechaInicio', 'horarioInicio', 'horarioFin']
+
+const ICONOS_DOCUMENTO: Record<CodigoDocumento, string> = {
+  carta_aceptacion: 'fa-solid fa-envelope',
+  avance: 'fa-solid fa-clipboard-list',
+  cierre: 'fa-solid fa-flag-checkered',
+}
+
+const PASO_DOCUMENTO: Record<CodigoDocumento, number> = {
+  carta_aceptacion: 1,
+  avance: 2,
+  cierre: 3,
+}
+
+const TITULOS_DOCUMENTO: Record<CodigoDocumento, string> = {
+  carta_aceptacion: 'Carta de aceptación',
+  avance: 'Avance',
+  cierre: 'Cierre',
+}
+
+function iniciales(nombre: string): string {
+  return nombre
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((palabra) => palabra.charAt(0))
+    .join('')
+    .toUpperCase()
+}
+
+function TarjetaAlumno({ profile }: { profile: Persona }) {
+  return (
+    <section className="card alumno-card">
+      <span className="alumno-avatar">{iniciales(profile.nombre)}</span>
+      <div className="alumno-info">
+        <span className="alumno-rol">Alumno</span>
+        <strong className="alumno-nombre">{profile.nombre}</strong>
+        <span className="alumno-carrera">
+          <i className="fa-solid fa-graduation-cap" aria-hidden="true" />
+          {profile.carreras?.nombre ?? '—'}
+        </span>
+      </div>
+      <div className="alumno-id">
+        <span className="dato-label">ID</span>
+        <span className="alumno-id-valor">{profile.id}</span>
+      </div>
+    </section>
+  )
+}
+
+function cartaAFormulario(datos: Record<string, unknown>): SolicitudCartaAlumno {
+  const actividades = Array.isArray(datos['actividades'])
+    ? (datos['actividades'] as unknown[])
+        .map((item) => (typeof item === 'string' ? item : ''))
+        .filter((item) => item.length > 0)
+        .map((valor) => ({ valor }))
+    : []
+  return {
+    empresa: typeof datos['empresa'] === 'string' ? (datos['empresa'] as string) : '',
+    lugar: typeof datos['lugar'] === 'string' ? (datos['lugar'] as string) : '',
+    supervisor: typeof datos['supervisor'] === 'string' ? (datos['supervisor'] as string) : '',
+    puestoSupervisor:
+      typeof datos['puestoSupervisor'] === 'string' ? (datos['puestoSupervisor'] as string) : '',
+    correoSupervisor:
+      typeof datos['correoSupervisor'] === 'string' ? (datos['correoSupervisor'] as string) : '',
+    actividades: actividades.length > 0 ? actividades : solicitudCartaAlumnoDefault.actividades,
+  }
+}
 
 function datosAFormulario(datos: DatosDocumentoGuardados): DatosDocumento {
   const actividades = (Array.isArray(datos.actividades) ? datos.actividades : [])
@@ -50,26 +121,352 @@ function MensajeEstado({
   exito?: boolean
 }) {
   return (
-    <div className="mx-auto max-w-2xl">
-      <Link to="/alumno/documentos" className="text-sm font-semibold text-brand-dark">
-        ← Volver a documentos
+    <div>
+      <Link to="/alumno/documentos" className="btn btn-ghost btn-sm">
+        <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+        Volver a documentos
       </Link>
-      <div
-        className={`mt-4 rounded-2xl border bg-white p-8 text-center shadow-sm ${
-          exito ? 'border-green-200' : 'border-amber-200'
-        }`}
-      >
-        <h1 className={`text-lg font-bold ${exito ? 'text-green-700' : 'text-amber-700'}`}>
-          {titulo}
-        </h1>
-        <p className="mt-2 text-sm text-gray-600">{texto}</p>
-        <Link
-          to="/alumno/documentos"
-          className="mt-5 inline-block rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
-        >
+      <div className="card gate-card" style={{ marginTop: 14 }}>
+        <div className="gate-head">
+          <span
+            className="logo logo-lg"
+            style={{ background: exito ? 'var(--ok)' : 'var(--accent)' }}
+          >
+            <i
+              className={exito ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-info'}
+              aria-hidden="true"
+            />
+          </span>
+          <div className="gate-title">
+            <h1>{titulo}</h1>
+            <p>Solicitud de documento</p>
+          </div>
+        </div>
+        <div className="gate-body">
+          <p className="quiet" style={{ textAlign: 'center' }}>
+            {texto}
+          </p>
+          <Link to="/alumno/documentos" className="btn btn-primary btn-block">
+            Volver a documentos
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FormularioCartaAlumno({ profile }: { profile: Persona }) {
+  const [estado, setEstado] = useState<Estado>('cargando')
+  const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
+  const [creadoEn, setCreadoEn] = useState<string | null>(null)
+  const [folio, setFolio] = useState<string | null>(null)
+  const [empresaEstado, setEmpresaEstado] = useState<EstadoEmpresa | null>(null)
+  const [empresaExpira, setEmpresaExpira] = useState<string | null>(null)
+  const [recarga, setRecarga] = useState(0)
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<SolicitudCartaAlumno>({
+    resolver: zodResolver(solicitudCartaAlumnoSchema),
+    defaultValues: solicitudCartaAlumnoDefault,
+    mode: 'onTouched',
+  })
+
+  const { fields, append, remove } = useFieldArray({ control, name: 'actividades' })
+  const soloLectura = estado === 'pendiente' || estado === 'aceptada'
+
+  useEffect(() => {
+    let cancelado = false
+    buscarProcesoPeriodo(profile.id)
+      .then(async (proceso) => {
+        if (cancelado) return
+        const vigente = proceso && proceso.estado !== 'rechazada' ? proceso : null
+        if (vigente) {
+          const enviado = await buscarDocumento(vigente.id, 'carta_aceptacion')
+          if (cancelado) return
+          if (enviado) {
+            reset(cartaAFormulario(enviado.datos as Record<string, unknown>))
+            setCreadoEn(enviado.creado_en)
+            setFolio(vigente.folio)
+            setEmpresaEstado(vigente.empresa_estado)
+            setEmpresaExpira(vigente.empresa_expira_en)
+            setEstado(vigente.estado === 'aceptada' ? 'aceptada' : 'pendiente')
+            return
+          }
+        }
+        setEstado('libre')
+      })
+      .catch(() => {
+        if (!cancelado) setEstado('libre')
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [profile.id, recarga, reset])
+
+  const onSubmit = handleSubmit(async (values) => {
+    if (soloLectura) return
+    setErrorEnvio(null)
+    try {
+      const folioEnviado = await crearSolicitud(profile.id, 'carta_aceptacion', {
+        ...values,
+        actividades: values.actividades.map((actividad) => actividad.valor),
+        origen: 'alumno',
+        completada_empresa: false,
+      })
+      setFolio(folioEnviado)
+      setEstado('enviada')
+      void avisarNuevoProceso(folioEnviado).catch((error) => {
+        console.error('No se pudo enviar el aviso del folio:', error)
+      })
+    } catch (error) {
+      setErrorEnvio(error instanceof Error ? error.message : 'No se pudo enviar la solicitud')
+      setRecarga((valor) => valor + 1)
+    }
+  })
+
+  if (estado === 'cargando') {
+    return (
+      <div>
+        <Link to="/alumno/documentos" className="btn btn-ghost btn-sm">
+          <i className="fa-solid fa-arrow-left" aria-hidden="true" />
           Volver a documentos
         </Link>
+        <p className="quiet field" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="spinner spinner-dark" aria-hidden="true" />
+          Verificando tu proceso de prácticas…
+        </p>
       </div>
+    )
+  }
+
+  if (estado === 'enviada') {
+    return (
+      <MensajeEstado
+        exito
+        titulo="Solicitud enviada"
+        texto={`Tu carta del proceso ${folio ?? ''} quedó pendiente de confirmación por la coordinación. Después la empresa completará los datos faltantes.`}
+      />
+    )
+  }
+
+  return (
+    <div>
+      <div className="top">
+        <div className="head-row">
+          <div className="head-icon">
+            <i className="fa-solid fa-envelope" aria-hidden="true" />
+          </div>
+          <div className="head-text">
+            <h1>Carta de aceptación</h1>
+            <span className="head-sub">Solicitud de documento</span>
+          </div>
+        </div>
+        <div className="head-meta">
+          <span className="meta-date">Paso 1 de 3</span>
+          {folio && (
+            <span className="tag">
+              <i className="fa-solid fa-hashtag" aria-hidden="true" />
+              <span style={{ fontFamily: 'var(--font-mono)' }}>{folio}</span>
+            </span>
+          )}
+          <Link to="/alumno/documentos" className="btn btn-ghost btn-sm">
+            Volver
+          </Link>
+        </div>
+      </div>
+
+      {soloLectura && estado !== 'aceptada' && empresaEstado === 'no_enviada' && (
+        <div className="alert alert-warn">
+          <i className="fa-solid fa-hourglass-half" aria-hidden="true" />
+          <span>
+            <strong style={{ display: 'block' }}>Pendiente de confirmación por la coordinación{creadoEn ? ` · enviada el ${formatearFecha(creadoEn)}` : ''}</strong>
+            Cuando la coordinación confirme, se enviará un enlace temporal a la empresa.
+          </span>
+        </div>
+      )}
+
+      {soloLectura && estado !== 'aceptada' && empresaEstado === 'enviada' && (
+        <div className="alert alert-info">
+          <i className="fa-solid fa-paper-plane" aria-hidden="true" />
+          <span>
+            <strong style={{ display: 'block' }}>Enlace enviado a la empresa</strong>
+            La empresa debe completar los datos faltantes
+            {empresaExpira ? ` antes del ${formatearFecha(empresaExpira)}` : ''}.
+          </span>
+        </div>
+      )}
+
+      {soloLectura && estado !== 'aceptada' && empresaEstado === 'completada' && (
+        <div className="alert alert-ok">
+          <i className="fa-solid fa-circle-check" aria-hidden="true" />
+          <span>
+            <strong style={{ display: 'block' }}>Carta completa</strong>
+            La empresa ya completó los datos. Puedes solicitar avance y cierre.
+          </span>
+        </div>
+      )}
+
+      {soloLectura && estado === 'aceptada' && (
+        <div className="alert alert-ok">
+          <i className="fa-solid fa-circle-check" aria-hidden="true" />
+          <span>
+            <strong style={{ display: 'block' }}>Solicitud aceptada</strong>
+            La coordinación aprobó tu proceso. No es posible modificar los datos.
+          </span>
+        </div>
+      )}
+
+      {errorEnvio && (
+        <div className="error">
+          <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
+          <span>{errorEnvio}</span>
+        </div>
+      )}
+
+      <form onSubmit={onSubmit}>
+        <TarjetaAlumno profile={profile} />
+
+        <section className="card card-pad" style={{ marginTop: 14 }}>
+          <div className="form-card-head">
+            <span className="sec-icon i-empresa">
+              <i className="fa-solid fa-building" aria-hidden="true" />
+            </span>
+            <h2>Empresa</h2>
+          </div>
+          <div className="form-row">
+            <FormField label="Empresa" required error={errors.empresa?.message}>
+              <TextInput
+                {...register('empresa')}
+                placeholder="Ej. Empresa Demo, S.A. de C.V."
+                disabled={soloLectura || isSubmitting}
+              />
+            </FormField>
+            <FormField label="Lugar" required error={errors.lugar?.message}>
+              <TextInput
+                {...register('lugar')}
+                placeholder="Ej. Altamira, Tamaulipas"
+                disabled={soloLectura || isSubmitting}
+              />
+            </FormField>
+          </div>
+        </section>
+
+        <section className="card card-pad" style={{ marginTop: 14 }}>
+          <div className="form-card-head">
+            <span className="sec-icon i-supervision">
+              <i className="fa-solid fa-user-tie" aria-hidden="true" />
+            </span>
+            <h2>Supervisor</h2>
+          </div>
+          <div className="form-row">
+            <FormField label="Supervisor" required error={errors.supervisor?.message}>
+              <TextInput
+                {...register('supervisor')}
+                placeholder="Ej. Ing. Andrea Morales"
+                disabled={soloLectura || isSubmitting}
+              />
+            </FormField>
+            <FormField label="Puesto del supervisor" required error={errors.puestoSupervisor?.message}>
+              <TextInput
+                {...register('puestoSupervisor')}
+                placeholder="Ej. Líder de Proyectos Digitales"
+                disabled={soloLectura || isSubmitting}
+              />
+            </FormField>
+            <FormField label="Correo del supervisor" required error={errors.correoSupervisor?.message}>
+              <TextInput
+                type="email"
+                {...register('correoSupervisor')}
+                placeholder="Ej. supervisor@empresa.com"
+                disabled={soloLectura || isSubmitting}
+              />
+            </FormField>
+          </div>
+          <p className="field-hint">
+            A este correo llegará el enlace temporal para que la empresa complete giro, tamaño,
+            fechas, horarios y directivo.
+          </p>
+        </section>
+
+        <section className="card card-pad" style={{ marginTop: 14 }}>
+          <div className="form-card-head">
+            <span className="sec-icon i-actividades">
+              <i className="fa-solid fa-list-check" aria-hidden="true" />
+            </span>
+            <h2>Actividades</h2>
+            <button
+              type="button"
+              className="btn btn-sm accion"
+              onClick={() => append({ valor: '' })}
+              disabled={soloLectura || isSubmitting}
+            >
+              <i className="fa-solid fa-plus" aria-hidden="true" />
+              Agregar
+            </button>
+          </div>
+          <div className="field">
+            {fields.map((field, index) => (
+              <div key={field.id} className="form-row" style={{ alignItems: 'flex-end', marginBottom: 12 }}>
+                <FormField
+                  label={`Actividad ${index + 1}`}
+                  required
+                  error={errors.actividades?.[index]?.valor?.message}
+                >
+                  <TextInput
+                    {...register(`actividades.${index}.valor`)}
+                    placeholder="Ej. Desarrollo y documentación de soluciones digitales"
+                    disabled={soloLectura || isSubmitting}
+                  />
+                </FormField>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => remove(index)}
+                  disabled={fields.length === 1 || soloLectura || isSubmitting}
+                >
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                  Quitar
+                </button>
+              </div>
+            ))}
+          </div>
+          {errors.actividades?.message && (
+            <p className="field-hint" style={{ color: 'var(--danger)', fontWeight: 700 }}>
+              {errors.actividades.message}
+            </p>
+          )}
+        </section>
+
+        {!soloLectura && (
+          <div
+            className="card card-pad field"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}
+          >
+            <p className="quiet" style={{ margin: 0, fontSize: '0.8rem' }}>
+              <i className="fa-solid fa-circle-info" aria-hidden="true" /> Al enviar se abre tu
+              proceso y la coordinación confirmará antes de avisar a la empresa.
+            </p>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <span className="spinner" aria-hidden="true" />
+                  Enviando…
+                </>
+              ) : (
+                <>
+                  <i className="fa-solid fa-paper-plane" aria-hidden="true" />
+                  Enviar solicitud
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </form>
     </div>
   )
 }
@@ -79,6 +476,7 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
   const soloFechas = !esCarta
 
   const [estado, setEstado] = useState<Estado>('cargando')
+  const [faltaEmpresa, setFaltaEmpresa] = useState(false)
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
   const [creadoEn, setCreadoEn] = useState<string | null>(null)
   const [folio, setFolio] = useState<string | null>(null)
@@ -138,9 +536,16 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
           const carta = await buscarDocumento(vigente.id, 'carta_aceptacion')
           if (cancelado) return
           if (!carta) {
+            setFaltaEmpresa(false)
             setEstado('no-disponible')
             return
           }
+          if (!cartaCompletadaPorEmpresa(carta.datos)) {
+            setFaltaEmpresa(true)
+            setEstado('no-disponible')
+            return
+          }
+          setFaltaEmpresa(false)
           reset(datosAFormulario(carta.datos))
           setFolio(vigente.folio)
           setEstado('libre')
@@ -181,12 +586,13 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
 
   if (estado === 'cargando') {
     return (
-      <div className="mx-auto max-w-2xl">
-        <Link to="/alumno/documentos" className="text-sm font-semibold text-brand-dark">
-          ← Volver a documentos
+      <div>
+        <Link to="/alumno/documentos" className="btn btn-ghost btn-sm">
+          <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+          Volver a documentos
         </Link>
-        <p className="mt-6 flex items-center gap-3 text-sm text-gray-500">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-brand" />
+        <p className="quiet field" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="spinner spinner-dark" aria-hidden="true" />
           Verificando tu proceso de prácticas…
         </p>
       </div>
@@ -196,8 +602,12 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
   if (estado === 'no-disponible') {
     return (
       <MensajeEstado
-        titulo="Primero solicita la carta de aceptación"
-        texto="Para abrir un proceso de prácticas debes enviar primero tu carta de aceptación. Después podrás solicitar el avance y el cierre con los mismos datos."
+        titulo={faltaEmpresa ? 'La empresa aún no completa la carta' : 'Primero solicita la carta de aceptación'}
+        texto={
+          faltaEmpresa
+            ? 'La carta está pendiente de confirmación o de los datos de la empresa. Cuando la empresa complete giro, tamaño, fechas, horarios y directivo, podrás solicitar avance y cierre.'
+            : 'Para abrir un proceso de prácticas debes enviar primero tu carta de aceptación. Después podrás solicitar el avance y el cierre con los mismos datos.'
+        }
       />
     )
   }
@@ -213,78 +623,79 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <Link to="/alumno/documentos" className="text-sm font-semibold text-brand-dark">
-        ← Volver a documentos
-      </Link>
-
-      <h1 className="mt-4 text-2xl font-bold">
-        {esCarta ? 'Solicitud de carta de aceptación' : `Solicitud de constancia de ${documento}`}
-      </h1>
-      <p className="mt-2 text-sm text-gray-500">
-        {soloLectura
-          ? 'Revisa los datos que enviaste en tu solicitud. No es posible modificarlos.'
-          : soloFechas
-            ? 'Los datos se copiaron de tu carta de aceptación. Solo puedes modificar las fechas y horarios.'
-            : 'Completa los datos de la empresa donde realizarás tus prácticas.'}
-      </p>
+    <div>
+      <div className="top">
+        <div className="head-row">
+          <div className="head-icon">
+            <i className={ICONOS_DOCUMENTO[documento]} aria-hidden="true" />
+          </div>
+          <div className="head-text">
+            <h1>{TITULOS_DOCUMENTO[documento]}</h1>
+            <span className="head-sub">
+              {esCarta ? 'Solicitud de documento' : 'Constancia de avance / cierre'}
+            </span>
+          </div>
+        </div>
+        <div className="head-meta">
+          <span className="meta-date">Paso {PASO_DOCUMENTO[documento]} de 3</span>
+          {folio && (
+            <span className="tag">
+              <i className="fa-solid fa-hashtag" aria-hidden="true" />
+              <span style={{ fontFamily: 'var(--font-mono)' }}>{folio}</span>
+            </span>
+          )}
+          <Link to="/alumno/documentos" className="btn btn-ghost btn-sm">
+            Volver
+          </Link>
+        </div>
+      </div>
 
       {soloLectura && (
-        <div
-          className={`mt-4 rounded-xl border p-4 text-sm ${
-            estado === 'aceptada'
-              ? 'border-green-200 bg-green-50 text-green-800'
-              : 'border-amber-200 bg-amber-50 text-amber-800'
-          }`}
-        >
-          <p className="font-semibold">
-            {estado === 'aceptada' ? 'Solicitud aceptada' : 'Solicitud en espera de revisión'}
-            {folio ? ` · proceso ${folio}` : ''}
-            {creadoEn ? ` · enviada el ${formatearFecha(creadoEn)}` : ''}
-          </p>
-          <p className="mt-1">
+        <div className={`alert ${estado === 'aceptada' ? 'alert-ok' : 'alert-warn'}`}>
+          <i
+            className={estado === 'aceptada' ? 'fa-solid fa-circle-check' : 'fa-solid fa-hourglass-half'}
+            aria-hidden="true"
+          />
+          <span>
+            <strong style={{ display: 'block' }}>
+              {estado === 'aceptada' ? 'Solicitud aceptada' : 'Solicitud en espera de revisión'}
+              {creadoEn ? ` · enviada el ${formatearFecha(creadoEn)}` : ''}
+            </strong>
             {estado === 'aceptada'
-              ? 'La coordinación aprobó tu solicitud. El resultado también aparece en tu panel de documentos.'
+              ? 'La coordinación aprobó tu solicitud. No es posible modificar los datos.'
               : 'La coordinación revisará tu solicitud y el resultado aparecerá en tu panel de documentos.'}
-          </p>
+          </span>
         </div>
       )}
 
       {soloFechasEditables && (
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          <p className="font-semibold">
-            Datos copiados de tu carta de aceptación
-            {folio ? ` · proceso ${folio}` : ''}
-          </p>
-          <p className="mt-1">Solo puedes modificar la fecha de inicio y los horarios.</p>
+        <div className="alert alert-info">
+          <i className="fa-solid fa-copy" aria-hidden="true" />
+          <span>
+            <strong style={{ display: 'block' }}>Datos copiados de tu carta de aceptación</strong>
+            Solo puedes modificar la fecha de inicio y los horarios.
+          </span>
         </div>
       )}
 
       {errorEnvio && (
-        <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
-          {errorEnvio}
-        </p>
+        <div className="error">
+          <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
+          <span>{errorEnvio}</span>
+        </div>
       )}
 
-      <form onSubmit={onSubmit} className="mt-6 space-y-5">
-        <section className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="font-semibold">Datos del alumno</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <FormField label="Nombre">
-              <TextInput value={profile.nombre} disabled readOnly />
-            </FormField>
-            <FormField label="ID">
-              <TextInput value={profile.id} disabled readOnly />
-            </FormField>
-            <FormField label="Carrera">
-              <TextInput value={profile.carreras?.nombre ?? '—'} disabled readOnly />
-            </FormField>
-          </div>
-        </section>
+      <form onSubmit={onSubmit}>
+        <TarjetaAlumno profile={profile} />
 
-        <section className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="font-semibold">Empresa</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <section className="card card-pad" style={{ marginTop: 14 }}>
+          <div className="form-card-head">
+            <span className="sec-icon i-empresa">
+              <i className="fa-solid fa-building" aria-hidden="true" />
+            </span>
+            <h2>Empresa</h2>
+          </div>
+          <div className="form-row">
             <FormField label="Empresa" required error={errors.empresa?.message}>
               <TextInput
                 {...register('empresa')}
@@ -306,27 +717,33 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
                 disabled={!editable('giro') || isSubmitting}
               />
             </FormField>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Tipo" required error={errors.tipoOrganizacion?.message}>
-                <Select {...register('tipoOrganizacion')} disabled={!editable('tipoOrganizacion') || isSubmitting}>
-                  <option value="Privada">Privada</option>
-                  <option value="Pública">Pública</option>
-                </Select>
-              </FormField>
-              <FormField label="Tamaño" required error={errors.tamano?.message}>
-                <Select {...register('tamano')} disabled={!editable('tamano') || isSubmitting}>
-                  <option value="Pequeña">Pequeña</option>
-                  <option value="Mediana">Mediana</option>
-                  <option value="Grande">Grande</option>
-                </Select>
-              </FormField>
-            </div>
+            <FormField label="Tipo" required error={errors.tipoOrganizacion?.message}>
+              <Select
+                {...register('tipoOrganizacion')}
+                disabled={!editable('tipoOrganizacion') || isSubmitting}
+              >
+                <option value="Privada">Privada</option>
+                <option value="Pública">Pública</option>
+              </Select>
+            </FormField>
+            <FormField label="Tamaño" required error={errors.tamano?.message}>
+              <Select {...register('tamano')} disabled={!editable('tamano') || isSubmitting}>
+                <option value="Pequeña">Pequeña</option>
+                <option value="Mediana">Mediana</option>
+                <option value="Grande">Grande</option>
+              </Select>
+            </FormField>
           </div>
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="font-semibold">Fechas y horario</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <section className="card card-pad" style={{ marginTop: 14 }}>
+          <div className="form-card-head">
+            <span className="sec-icon i-fechas">
+              <i className="fa-solid fa-calendar-days" aria-hidden="true" />
+            </span>
+            <h2>Fechas y horario</h2>
+          </div>
+          <div className="form-row">
             <FormField label="Fecha de inicio" required error={errors.fechaInicio?.message}>
               <TextInput
                 type="date"
@@ -358,9 +775,14 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
           </div>
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="font-semibold">Supervisión y autorización</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <section className="card card-pad" style={{ marginTop: 14 }}>
+          <div className="form-card-head">
+            <span className="sec-icon i-supervision">
+              <i className="fa-solid fa-user-tie" aria-hidden="true" />
+            </span>
+            <h2>Supervisión y autorización</h2>
+          </div>
+          <div className="form-row">
             <FormField label="Supervisor" required error={errors.supervisor?.message}>
               <TextInput
                 {...register('supervisor')}
@@ -379,11 +801,7 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
                 disabled={!editable('puestoSupervisor') || isSubmitting}
               />
             </FormField>
-            <FormField
-              label="Directivo que autoriza"
-              required
-              error={errors.directivo?.message}
-            >
+            <FormField label="Directivo que autoriza" required error={errors.directivo?.message}>
               <TextInput
                 {...register('directivo')}
                 placeholder="Ej. Lic. Roberto Martínez"
@@ -393,62 +811,92 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
           </div>
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-6">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="font-semibold">Actividades</h2>
+        <section className="card card-pad" style={{ marginTop: 14 }}>
+          <div className="form-card-head">
+            <span className="sec-icon i-actividades">
+              <i className="fa-solid fa-list-check" aria-hidden="true" />
+            </span>
+            <h2>Actividades</h2>
             <button
               type="button"
+              className="btn btn-sm accion"
               onClick={() => append({ valor: '' })}
               disabled={!editable('actividades') || isSubmitting}
-              className="rounded-lg border border-brand px-3 py-1.5 text-sm font-semibold text-brand-dark hover:bg-orange-50 disabled:opacity-60"
             >
-              + Agregar
+              <i className="fa-solid fa-plus" aria-hidden="true" />
+              Agregar
             </button>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="field-hint" style={{ margin: '-6px 0 16px' }}>
             Describe las actividades que desempeñarás durante tus prácticas.
           </p>
 
-          <div className="mt-4 space-y-3">
+          <div className="field">
             {fields.map((field, index) => (
-              <div key={field.id} className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <FormField
-                    label={`Actividad ${index + 1}`}
-                    required
-                    error={errors.actividades?.[index]?.valor?.message}
-                  >
-                    <TextInput
-                      {...register(`actividades.${index}.valor`)}
-                      placeholder="Ej. Desarrollo y documentación de soluciones digitales"
-                      disabled={!editable('actividades') || isSubmitting}
-                    />
-                  </FormField>
-                </div>
+              <div
+                key={field.id}
+                className="form-row"
+                style={{ alignItems: 'flex-end', marginBottom: 12 }}
+              >
+                <FormField
+                  label={`Actividad ${index + 1}`}
+                  required
+                  error={errors.actividades?.[index]?.valor?.message}
+                >
+                  <TextInput
+                    {...register(`actividades.${index}.valor`)}
+                    placeholder="Ej. Desarrollo y documentación de soluciones digitales"
+                    disabled={!editable('actividades') || isSubmitting}
+                  />
+                </FormField>
                 <button
                   type="button"
+                  className="btn btn-ghost btn-sm"
                   onClick={() => remove(index)}
                   disabled={fields.length === 1 || !editable('actividades') || isSubmitting}
-                  className="mt-7 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-500 hover:bg-gray-50 disabled:opacity-40"
                 >
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
                   Quitar
                 </button>
               </div>
             ))}
           </div>
           {errors.actividades?.message && (
-            <p className="mt-2 text-xs font-semibold text-red-600">{errors.actividades.message}</p>
+            <p className="field-hint" style={{ color: 'var(--danger)', fontWeight: 700 }}>
+              {errors.actividades.message}
+            </p>
           )}
         </section>
 
         {!soloLectura && (
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-60"
-            >
-              {isSubmitting ? 'Enviando…' : 'Enviar solicitud'}
+          <div
+            className="card card-pad field"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 14,
+              flexWrap: 'wrap',
+            }}
+          >
+            <p className="quiet" style={{ margin: 0, fontSize: '0.8rem' }}>
+              <i className="fa-solid fa-circle-info" aria-hidden="true" />{' '}
+              {esCarta
+                ? 'Al enviar se abre tu proceso de prácticas y la coordinación recibirá un aviso.'
+                : 'Al enviar, la coordinación recibirá este documento para revisión.'}
+            </p>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <span className="spinner" aria-hidden="true" />
+                  Enviando…
+                </>
+              ) : (
+                <>
+                  <i className="fa-solid fa-paper-plane" aria-hidden="true" />
+                  Enviar solicitud
+                </>
+              )}
             </button>
           </div>
         )}
@@ -460,5 +908,6 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
 export default function FormularioDocumentoPage({ documento }: { documento: CodigoDocumento }) {
   const { profile } = useAuth()
   if (!profile) return null
+  if (documento === 'carta_aceptacion') return <FormularioCartaAlumno profile={profile} />
   return <FormularioDocumento profile={profile} documento={documento} />
 }

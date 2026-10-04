@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { DOCUMENTOS } from '../../lib/documentos'
+import { DOCUMENTOS, type CodigoDocumento } from '../../lib/documentos'
+import { cartaCompletadaPorEmpresa } from '../../lib/empresa'
 import {
   buscarProcesoConDocumentos,
   type EstadoProceso,
@@ -10,24 +11,40 @@ import {
 
 const CARTA_HREF = '/alumno/solicitud/carta-aceptacion'
 
-const ESTILOS_ESTADO: Record<EstadoProceso, string> = {
-  pendiente: 'bg-amber-100 text-amber-800',
-  aceptada: 'bg-green-100 text-green-800',
-  rechazada: 'bg-red-100 text-red-800',
+const ICONOS_DOCUMENTO: Record<CodigoDocumento, string> = {
+  carta_aceptacion: 'fa-solid fa-envelope',
+  avance: 'fa-solid fa-clipboard-list',
+  cierre: 'fa-solid fa-flag-checkered',
 }
 
-const TEXTOS_ESTADO: Record<EstadoProceso, string> = {
-  pendiente: 'En espera de la respuesta del coordinador.',
-  aceptada: 'La coordinación aprobó tu proceso de prácticas.',
-  rechazada: 'La coordinación rechazó tu proceso de prácticas.',
+const COLORES_DOCUMENTO: Record<CodigoDocumento, string> = {
+  carta_aceptacion: 'd-carta',
+  avance: 'd-avance',
+  cierre: 'd-cierre',
+}
+
+const ESTILOS_BADGE: Record<EstadoProceso, string> = {
+  pendiente: 'b-pendiente',
+  aceptada: 'b-atendido',
+  rechazada: 'b-rechazada',
+}
+
+const ETIQUETAS_ESTADO: Record<EstadoProceso, string> = {
+  pendiente: 'Pendiente',
+  aceptada: 'Aceptada',
+  rechazada: 'Rechazada',
 }
 
 interface Tarjeta {
-  badge: EstadoProceso | null
+  badge: { clase: string; etiqueta: string } | null
   texto: string
   accion: string
   href: string
 }
+
+const BADGE_RECHAZADA = { clase: 'b-rechazada', etiqueta: 'Rechazada' }
+const BADGE_ATENDIDA = { clase: 'b-atendido', etiqueta: 'Aceptada' }
+const BADGE_PENDIENTE = { clase: 'b-pendiente', etiqueta: 'En revisión' }
 
 function evaluarTarjeta(
   proceso: ProcesoConDocumentos | null | undefined,
@@ -37,59 +54,70 @@ function evaluarTarjeta(
 
   if (!proceso) {
     return esCarta
-      ? { badge: null, texto: doc.descripcion, accion: 'Solicitar →', href: doc.href }
+      ? { badge: null, texto: doc.descripcion, accion: 'Solicitar', href: doc.href }
       : {
           badge: null,
           texto: 'Primero solicita la carta de aceptación para abrir un proceso.',
-          accion: 'Ir a la carta →',
+          accion: 'Ir a la carta',
           href: CARTA_HREF,
         }
   }
 
   const solicitud = proceso.solicitudes.find((s) => s.documento === doc.codigo)
+  const carta = proceso.solicitudes.find((s) => s.documento === 'carta_aceptacion')
+  const cartaLista = cartaCompletadaPorEmpresa(carta?.datos)
 
   if (proceso.estado === 'rechazada') {
     if (esCarta) {
       return {
-        badge: 'rechazada',
-        texto: 'Rechazada. Puedes solicitarla de nuevo abriendo un proceso nuevo.',
-        accion: 'Solicitar de nuevo →',
+        badge: BADGE_RECHAZADA,
+        texto: 'Puedes solicitarla de nuevo abriendo un proceso nuevo.',
+        accion: 'Solicitar de nuevo',
         href: doc.href,
       }
     }
     return {
-      badge: 'rechazada',
+      badge: BADGE_RECHAZADA,
       texto: 'El proceso fue rechazado. Primero solicita la carta de aceptación para abrir uno nuevo.',
-      accion: 'Ir a la carta →',
+      accion: 'Ir a la carta',
       href: CARTA_HREF,
     }
   }
 
   if (proceso.estado === 'aceptada') {
     return {
-      badge: 'aceptada',
-      texto: solicitud ? TEXTOS_ESTADO.aceptada : 'Tu proceso ya fue aceptado.',
-      accion: solicitud ? 'Ver solicitud →' : '',
+      badge: BADGE_ATENDIDA,
+      texto: solicitud
+        ? 'La coordinación aprobó tu solicitud.'
+        : 'Tu proceso ya fue aceptado; este documento no aplica.',
+      accion: solicitud ? 'Ver solicitud' : '',
       href: doc.href,
     }
   }
 
-  if (solicitud) {
-    return { badge: 'pendiente', texto: TEXTOS_ESTADO.pendiente, accion: 'Ver solicitud →', href: doc.href }
+  if (!esCarta && !cartaLista) {
+    return {
+      badge: BADGE_PENDIENTE,
+      texto: 'Disponible cuando la empresa complete la carta de aceptación.',
+      accion: 'Ver carta',
+      href: CARTA_HREF,
+    }
   }
 
-  return { badge: null, texto: doc.descripcion, accion: 'Solicitar →', href: doc.href }
+  if (solicitud) {
+    return {
+      badge: BADGE_PENDIENTE,
+      texto: 'En espera de la respuesta del coordinador.',
+      accion: 'Ver solicitud',
+      href: doc.href,
+    }
+  }
+
+  return { badge: null, texto: doc.descripcion, accion: 'Solicitar', href: doc.href }
 }
 
 function BadgeEstado({ estado }: { estado: EstadoProceso }) {
-  const etiqueta = estado.charAt(0).toUpperCase() + estado.slice(1)
-  return (
-    <span
-      className={`inline-block shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${ESTILOS_ESTADO[estado]}`}
-    >
-      {etiqueta}
-    </span>
-  )
+  return <span className={`badge ${ESTILOS_BADGE[estado]}`}>{ETIQUETAS_ESTADO[estado]}</span>
 }
 
 export default function DocumentosPage() {
@@ -102,44 +130,117 @@ export default function DocumentosPage() {
     enabled: Boolean(alumnoId),
   })
 
+  const cartaDelProceso = proceso?.solicitudes.find((s) => s.documento === 'carta_aceptacion')
+  const cartaLista = cartaCompletadaPorEmpresa(cartaDelProceso?.datos)
+
   return (
     <div>
-      <p className="text-xs font-bold uppercase tracking-widest text-brand-dark">
-        Portal del alumno
-      </p>
-      <h1 className="mt-1 text-2xl font-bold">Consulta de documentos para prácticas</h1>
-      <p className="mt-2 text-sm text-gray-500">
+      <div className="top">
+        <div className="head-row">
+          <div className="head-icon">
+            <i className="fa-solid fa-folder-open" aria-hidden="true" />
+          </div>
+          <div className="head-text">
+            <h1>Mis documentos</h1>
+            <span className="head-sub">Portal del alumno</span>
+          </div>
+        </div>
+
+        {proceso && (
+          <div className="head-meta">
+            <span className="tag">
+              <i className="fa-solid fa-hashtag" aria-hidden="true" />
+              <span style={{ fontFamily: 'var(--font-mono)' }}>{proceso.folio}</span>
+            </span>
+            <span className="meta-date">
+              {proceso.solicitudes.length} de {DOCUMENTOS.length} documentos
+            </span>
+            <BadgeEstado estado={proceso.estado} />
+          </div>
+        )}
+      </div>
+
+      <p className="quiet" style={{ marginTop: -8 }}>
         Cada proceso agrupa tus 3 documentos: carta de aceptación, avance y cierre.
       </p>
 
-      {proceso && (
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm">
-          <span className="font-semibold text-slate-900">
-            Proceso <span className="font-mono">{proceso.folio}</span>
+      {!proceso && (
+        <div className="alert alert-info">
+          <i className="fa-solid fa-circle-info" aria-hidden="true" />
+          <span>
+            <strong style={{ display: 'block' }}>Para comenzar, solicita tu carta de aceptación</strong>
+            Con ella se abre tu proceso; después podrás enviar el avance y el cierre con los mismos
+            datos.
           </span>
-          <span className="text-gray-500">
-            {proceso.solicitudes.length} de {DOCUMENTOS.length} documentos
-          </span>
-          <BadgeEstado estado={proceso.estado} />
         </div>
       )}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {DOCUMENTOS.map((doc) => {
+      {proceso?.estado === 'rechazada' && (
+        <div className="alert alert-warn">
+          <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+          <span>
+            <strong style={{ display: 'block' }}>Tu proceso fue rechazado</strong>
+            Solicita de nuevo la carta de aceptación para abrir un proceso nuevo.
+          </span>
+        </div>
+      )}
+
+      {proceso?.estado === 'pendiente' && !cartaLista && (
+        <div className="alert alert-info">
+          <i className="fa-solid fa-building" aria-hidden="true" />
+          <span>
+            <strong style={{ display: 'block' }}>Carta pendiente de la empresa</strong>
+            Avance y cierre se desbloquean cuando la empresa complete giro, tamaño, fechas,
+            horarios y directivo.
+          </span>
+        </div>
+      )}
+
+      {proceso && (
+        <div className="card card-pad" style={{ marginBottom: 18 }}>
+          <div
+            className="bar"
+            style={{ height: 6 }}
+            title={`${proceso.solicitudes.length} de ${DOCUMENTOS.length} documentos`}
+          >
+            <span
+              className="bar-total"
+              style={{
+                display: 'block',
+                height: '100%',
+                width: `${(proceso.solicitudes.length / DOCUMENTOS.length) * 100}%`,
+                background: 'var(--accent)',
+                borderRadius: 'var(--r-pill)',
+                transition: 'width .6s var(--ease-spring)',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="doc-grid">
+        {DOCUMENTOS.map((doc, index) => {
           const tarjeta = evaluarTarjeta(proceso, doc)
           return (
-            <Link
-              key={doc.codigo}
-              to={tarjeta.href}
-              className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand hover:shadow-md"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <h2 className="font-semibold">{doc.titulo}</h2>
-                {tarjeta.badge && <BadgeEstado estado={tarjeta.badge} />}
+            <Link key={doc.codigo} to={tarjeta.href} className="card hover-lift doc-card">
+              <div className="doc-top">
+                <span className={`doc-icon-box ${COLORES_DOCUMENTO[doc.codigo]}`}>
+                  <i className={ICONOS_DOCUMENTO[doc.codigo]} aria-hidden="true" />
+                </span>
+                <div className="doc-info">
+                  <span className="doc-paso">
+                    Paso {index + 1} de {DOCUMENTOS.length}
+                  </span>
+                  <h2>{doc.titulo}</h2>
+                </div>
+                {tarjeta.badge && (
+                  <span className={`badge ${tarjeta.badge.clase}`}>{tarjeta.badge.etiqueta}</span>
+                )}
               </div>
-              <p className="mt-2 text-sm text-gray-500">{tarjeta.texto}</p>
-              <span className="mt-4 inline-block text-sm font-bold text-brand-dark">
-                {tarjeta.accion || 'Ver detalle →'}
+              <p className="doc-desc">{tarjeta.texto}</p>
+              <span className="doc-cta">
+                {tarjeta.accion || 'Ver detalle'}
+                <i className="fa-solid fa-arrow-right" aria-hidden="true" />
               </span>
             </Link>
           )

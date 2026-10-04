@@ -1,6 +1,8 @@
 # Logs
 logs
 *.log
+*.log.*
+vite-dev.log*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -16,6 +18,13 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Secrets / API keys - nunca commitear
+api-brevo
+*-brevo
+brevo-*
+*.key
+*.pem
 
 # Editor directories and files
 .vscode/*

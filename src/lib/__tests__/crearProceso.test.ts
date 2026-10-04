@@ -18,6 +18,10 @@ const proceso = (extra: Partial<Proceso> = {}): Proceso => ({
   periodo: periodoActual(),
   estado: 'pendiente',
   creado_en: '2026-09-01T00:00:00Z',
+  empresa_correo: null,
+  empresa_estado: 'no_enviada',
+  empresa_expira_en: null,
+  empresa_completada_en: null,
   ...extra,
 })
 
@@ -107,16 +111,24 @@ describe('crearProceso', () => {
 
 describe('crearSolicitud', () => {
   const datos = { empresa: 'ACME', fecha_inicio: '2026-09-01' }
+  const cartaCompleta = {
+    data: { datos: { completada_empresa: true }, creado_en: '2026-09-01T00:00:00Z' },
+    error: null,
+  }
+  const cartaPendienteEmpresa = {
+    data: { datos: { completada_empresa: false }, creado_en: '2026-09-01T00:00:00Z' },
+    error: null,
+  }
 
   it('inserta el documento en el proceso pendiente y retorna el folio', async () => {
-    programar({ data: proceso(), error: null }, vacio)
+    programar({ data: proceso(), error: null }, cartaCompleta, vacio)
 
     const folio = await crearSolicitud('al1', 'avance', datos)
 
     expect(folio).toBe('AB12-CD34-EF56')
-    expect(registros).toHaveLength(2)
-    expect(registros[1].tabla).toBe('solicitudes')
-    expect(registros[1].metodos).toEqual([
+    expect(registros).toHaveLength(3)
+    expect(registros[2].tabla).toBe('solicitudes')
+    expect(registros[2].metodos).toEqual([
       {
         metodo: 'insert',
         args: [{ alumno_id: 'al1', proceso_id: 10, documento: 'avance', datos }],
@@ -142,6 +154,20 @@ describe('crearSolicitud', () => {
     expect(registros.some((r) => r.tabla === 'solicitudes')).toBe(false)
   })
 
+  it('bloquea avance o cierre si la empresa no ha completado la carta', async () => {
+    programar({ data: proceso(), error: null }, cartaPendienteEmpresa)
+
+    await expect(crearSolicitud('al1', 'cierre', datos)).rejects.toThrow(
+      'completada por la empresa',
+    )
+    expect(registros).toHaveLength(2)
+    expect(
+      registros.some((r) =>
+        r.tabla === 'solicitudes' && r.metodos.some((m) => m.metodo === 'insert'),
+      ),
+    ).toBe(false)
+  })
+
   it('con la carta crea el proceso y luego inserta el documento', async () => {
     programar(vacio, vacio, vacio, vacio, { data: proceso(), error: null }, vacio)
 
@@ -154,7 +180,7 @@ describe('crearSolicitud', () => {
   })
 
   it('un 23505 en la solicitud indica documento duplicado', async () => {
-    programar({ data: proceso(), error: null }, err('23505'))
+    programar({ data: proceso(), error: null }, cartaCompleta, err('23505'))
 
     await expect(crearSolicitud('al1', 'avance', datos)).rejects.toThrow(
       'Ya solicitaste este documento en tu proceso actual',
@@ -162,7 +188,7 @@ describe('crearSolicitud', () => {
   })
 
   it('un 42501 en la solicitud indica falta de permisos', async () => {
-    programar({ data: proceso(), error: null }, err('42501', 'row-level security'))
+    programar({ data: proceso(), error: null }, cartaCompleta, err('42501', 'row-level security'))
 
     await expect(crearSolicitud('al1', 'avance', datos)).rejects.toThrow(
       'No tienes permisos para enviar este documento',
