@@ -9,17 +9,13 @@ interface FormFieldProps {
 
 export default function FormField({ label, error, required = false, children }: FormFieldProps) {
   return (
-    <label className="form-group">
-      <span>
+    <label className="block min-w-0">
+      <span className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-ink/65">
         {label}
-        {required && <span style={{ color: 'var(--accent)' }}> *</span>}
+        {required && <span className="text-brand">*</span>}
       </span>
       {children}
-      {error && (
-        <span className="field-hint" style={{ color: 'var(--danger)', fontWeight: 700 }}>
-          {error}
-        </span>
-      )}
+      {error && <span className="mt-1.5 block text-xs font-semibold text-danger">{error}</span>}
     </label>
   )
 }

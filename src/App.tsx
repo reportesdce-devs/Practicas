@@ -46,7 +46,15 @@ function App() {
 
             <Route
               path="*"
-              element={<div className="py-16 text-center text-gray-500">Página no encontrada</div>}
+              element={
+                <div className="py-20 text-center">
+                  <i className="fa-solid fa-compass text-3xl text-ink/20" aria-hidden="true" />
+                  <p className="mt-3 text-sm font-bold text-ink">Página no encontrada</p>
+                  <p className="mt-1 text-sm text-ink/45">
+                    La dirección que buscas no existe o ya no está disponible.
+                  </p>
+                </div>
+              }
             />
           </Route>
         </Route>

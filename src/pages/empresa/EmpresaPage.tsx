@@ -1,18 +1,34 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { useSearchParams } from 'react-router-dom'
+import Alerta from '../../components/Alerta'
+import DatoCampo from '../../components/DatoCampo'
 import FormField from '../../components/form/FormField'
 import { Select, TextInput } from '../../components/form/inputs'
-import { guardarComplementoEmpresa, obtenerPrefillEmpresa, type PrefillEmpresa } from '../../lib/empresaApi'
-import { complementoEmpresaSchema, type ComplementoEmpresa } from '../../lib/schemas/documento'
+import PantallaEstado from '../../components/PantallaEstado'
+import {
+  guardarComplementoEmpresa,
+  obtenerPrefillEmpresa,
+  type PrefillEmpresa,
+} from '../../lib/empresaApi'
+import { formatearFecha } from '../../lib/formato'
+import {
+  complementoEmpresaSchema,
+  type ComplementoEmpresa,
+} from '../../lib/schemas/documento'
 
 type Estado = 'cargando' | 'lista' | 'guardada' | 'error'
 
-function formatearFecha(iso: string): string {
-  const fecha = new Date(iso)
-  if (Number.isNaN(fecha.getTime())) return iso
-  return new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }).format(fecha)
+function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) {
+  return (
+    <section className="card p-5 sm:p-6">
+      <h2 className="mb-5 border-b border-line pb-3.5 text-[0.8rem] font-bold tracking-[0.08em] text-ink uppercase">
+        {titulo}
+      </h2>
+      {children}
+    </section>
+  )
 }
 
 export default function EmpresaPage() {
@@ -69,87 +85,77 @@ export default function EmpresaPage() {
   })
 
   return (
-    <div className="empresa-page">
-      <div className="empresa-app">
-        <div className="card gate-card">
-          <div className="gate-head">
-            <img className="gate-logo" src="/logo-dce.png" alt="Logo de Ingenierías" />
-          </div>
-          <div className="gate-body">
-            <div className="login-head">
-              <span className="login-icon">
-                <i className="fa-solid fa-building" aria-hidden="true" />
+    <div className="min-h-dvh bg-white px-5 py-10 print:bg-white print:p-0 sm:px-8 sm:py-14">
+      <div className="mx-auto w-full max-w-2xl">
+        <div className="mb-8 flex justify-center print:hidden">
+          <img src="/logo-dce.png" alt="ISND" className="h-9 w-auto" />
+        </div>
+
+        <div className="text-center">
+          <i className="fa-solid fa-building text-2xl text-brand" aria-hidden="true" />
+          <p className="mt-4 text-[0.62rem] font-bold uppercase tracking-[0.16em] text-brand">
+            Prácticas profesionales
+          </p>
+          <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-ink">
+            Completa los datos de la empresa
+          </h1>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink/55">
+            Revisa la información registrada por el alumno y completa los datos faltantes. Al guardar,
+            el enlace se desactiva.
+          </p>
+
+          {prefill && (
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              <span className="etiqueta">
+                <i className="fa-solid fa-hashtag" aria-hidden="true" />
+                <span className="font-mono">{prefill.folio}</span>
               </span>
-              <h2>Completa los datos de la empresa</h2>
-              <p className="login-desc">
-                Revisa la información registrada por el alumno y completa los datos faltantes. Al
-                guardar, el enlace se desactiva.
-              </p>
+              <span className="etiqueta">Vence {formatearFecha(prefill.expira_en)}</span>
             </div>
-            {prefill && (
-              <div className="head-meta" style={{ justifyContent: 'center' }}>
-                <span className="tag">
-                  <i className="fa-solid fa-hashtag" aria-hidden="true" />
-                  <span style={{ fontFamily: 'var(--font-mono)' }}>{prefill.folio}</span>
-                </span>
-                <span className="meta-date">Vence {formatearFecha(prefill.expira_en)}</span>
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         {estado === 'cargando' && (
-          <p className="quiet field" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="spinner spinner-dark" aria-hidden="true" />
+          <p className="mt-10 flex items-center justify-center gap-3 text-sm text-ink/50">
+            <span className="spinner text-brand" aria-hidden="true" />
             Validando el enlace…
           </p>
         )}
 
         {estado === 'error' && (
-          <div className="card card-pad" style={{ marginTop: 14 }}>
-            <div className="error" style={{ marginBottom: 0 }}>
-              <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
-              <span>{mensaje ?? 'Enlace inválido o vencido.'}</span>
-            </div>
+          <div className="mt-10 flex justify-center">
+            <PantallaEstado
+              icono="fa-solid fa-link-slash"
+              tono="danger"
+              titulo="Enlace no disponible"
+              descripcion={mensaje ?? 'Enlace inválido o vencido.'}
+            />
           </div>
         )}
 
         {estado === 'lista' && prefill && (
-          <form onSubmit={onSubmit} style={{ marginTop: 14 }}>
-            <section className="card card-pad">
-              <div className="form-card-head">
-                <h2>Información del alumno (solo lectura)</h2>
+          <form onSubmit={onSubmit} className="mt-10 space-y-4">
+            <Seccion titulo="Información del alumno (solo lectura)">
+              <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                <DatoCampo label="Empresa" valor={prefill.alumno.empresa} />
+                <DatoCampo label="Lugar" valor={prefill.alumno.lugar} />
+                <DatoCampo label="Supervisor" valor={prefill.alumno.supervisor} />
+                <DatoCampo label="Puesto" valor={prefill.alumno.puestoSupervisor} />
               </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <span className="dato-label">Empresa</span>
-                  <span className="dato-valor">{prefill.alumno.empresa || '—'}</span>
-                </div>
-                <div className="form-group">
-                  <span className="dato-label">Lugar</span>
-                  <span className="dato-valor">{prefill.alumno.lugar || '—'}</span>
-                </div>
-                <div className="form-group">
-                  <span className="dato-label">Supervisor</span>
-                  <span className="dato-valor">{prefill.alumno.supervisor || '—'}</span>
-                </div>
-                <div className="form-group">
-                  <span className="dato-label">Puesto</span>
-                  <span className="dato-valor">{prefill.alumno.puestoSupervisor || '—'}</span>
-                </div>
-              </div>
-              <div className="form-section-label">Actividades</div>
-              <ol className="form-group" style={{ marginTop: 6, paddingLeft: 20 }}>
-                {prefill.alumno.actividades.map((item, index) => (
-                  <li key={index} style={{ fontSize: '0.85rem' }}>{item}</li>
-                ))}
-                {prefill.alumno.actividades.length === 0 && <li>Sin actividades registradas</li>}
-              </ol>
-            </section>
+              <p className="seccion mt-6">Actividades</p>
+              {prefill.alumno.actividades.length > 0 ? (
+                <ol className="lista">
+                  {prefill.alumno.actividades.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-sm text-ink/40">Sin actividades registradas</p>
+              )}
+            </Seccion>
 
-            <section className="card card-pad" style={{ marginTop: 14 }}>
-              <div className="form-card-head"><h2>Empresa</h2></div>
-              <div className="form-row">
+            <Seccion titulo="Empresa">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FormField label="Giro" required error={errors.giro?.message}>
                   <TextInput {...register('giro')} placeholder="Ej. Servicios" disabled={isSubmitting} />
                 </FormField>
@@ -167,11 +173,10 @@ export default function EmpresaPage() {
                   </Select>
                 </FormField>
               </div>
-            </section>
+            </Seccion>
 
-            <section className="card card-pad" style={{ marginTop: 14 }}>
-              <div className="form-card-head"><h2>Fechas y horario</h2></div>
-              <div className="form-row">
+            <Seccion titulo="Fechas y horario">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FormField label="Fecha de inicio" required error={errors.fechaInicio?.message}>
                   <TextInput type="date" {...register('fechaInicio')} disabled={isSubmitting} />
                 </FormField>
@@ -185,23 +190,25 @@ export default function EmpresaPage() {
                   <TextInput type="time" {...register('horarioFin')} disabled={isSubmitting} />
                 </FormField>
               </div>
-            </section>
+            </Seccion>
 
-            <section className="card card-pad" style={{ marginTop: 14 }}>
-              <div className="form-card-head"><h2>Autorización</h2></div>
+            <Seccion titulo="Autorización">
               <FormField label="Directivo que autoriza" required error={errors.directivo?.message}>
-                <TextInput {...register('directivo')} placeholder="Ej. Lic. Roberto Martínez" disabled={isSubmitting} />
+                <TextInput
+                  {...register('directivo')}
+                  placeholder="Ej. Lic. Roberto Martínez"
+                  disabled={isSubmitting}
+                />
               </FormField>
-            </section>
+            </Seccion>
 
             {mensaje && (
-              <div className="error" style={{ marginTop: 14 }}>
-                <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
-                <span>{mensaje}</span>
-              </div>
+              <Alerta icono="fa-solid fa-circle-exclamation" tono="danger">
+                {mensaje}
+              </Alerta>
             )}
 
-            <div className="field no-print" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div className="flex justify-end print:hidden">
               <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
@@ -220,16 +227,12 @@ export default function EmpresaPage() {
         )}
 
         {estado === 'guardada' && (
-          <div className="card card-pad" style={{ marginTop: 14 }}>
-            <div className="alert alert-ok">
-              <i className="fa-solid fa-circle-check" aria-hidden="true" />
-              <span>
-                <strong style={{ display: 'block' }}>Información guardada</strong>
-                Folio {folio ?? prefill?.folio ?? ''}. El enlace quedó desactivado. Puedes imprimir
-                esta confirmación para tu expediente físico.
-              </span>
-            </div>
-            <div className="field no-print" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div className="mt-10 space-y-4">
+            <Alerta icono="fa-solid fa-circle-check" tono="ok" titulo="Información guardada">
+              Folio {folio ?? prefill?.folio ?? ''}. El enlace quedó desactivado. Puedes imprimir esta
+              confirmación para tu expediente físico.
+            </Alerta>
+            <div className="flex justify-end print:hidden">
               <button type="button" className="btn btn-dark" onClick={() => window.print()}>
                 <i className="fa-solid fa-print" aria-hidden="true" />
                 Imprimir

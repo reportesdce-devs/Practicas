@@ -8,27 +8,24 @@ const OPCIONES: {
   titulo: string
   descripcion: string
   icono: string
-  claseIcono: string
 }[] = [
   {
     rol: 'alumno',
     titulo: 'Portal del alumno',
-    descripcion: 'Solicita y consulta tus documentos de prácticas profesionales.',
+    descripcion: 'Solicita y consulta tus documentos.',
     icono: 'fa-solid fa-user-graduate',
-    claseIcono: 'a-alumno',
   },
   {
     rol: 'coordinador',
     titulo: 'Panel de coordinación',
-    descripcion: 'Revisa, acepta o rechaza los procesos de prácticas.',
+    descripcion: 'Revisa y aprueba los procesos.',
     icono: 'fa-solid fa-clipboard-list',
-    claseIcono: 'a-coordinador',
   },
 ]
 
 export default function RoleSelectorPage() {
   const navigate = useNavigate()
-  const { profile, signOut } = useAuth()
+  const { signOut } = useAuth()
 
   function elegir(rol: Role) {
     guardarPortal(rol)
@@ -36,54 +33,48 @@ export default function RoleSelectorPage() {
   }
 
   return (
-    <div className="gate-shell">
-      <div className="app">
-        <div className="card gate-card">
-          <div className="gate-head">
-            <img className="gate-logo" src="/logo-dce.png" alt="Logo de Ingenierías" />
+    <div className="degradado-marco relative flex min-h-dvh items-center justify-center overflow-hidden px-5 py-12">
+      <div className="relative w-full max-w-md">
+        <div className="card rounded-2xl bg-paper p-7 shadow-lift sm:p-8">
+          <div className="text-center">
+            <img src="/logo-dce.png" alt="ISND" className="mx-auto h-9 w-auto" />
+            <p className="mt-4 text-[0.62rem] font-bold tracking-[0.18em] text-brand uppercase">
+              Prácticas profesionales
+            </p>
+            <h1 className="mt-3 text-xl font-extrabold tracking-tight text-ink">
+              ¿A dónde quieres entrar?
+            </h1>
           </div>
-          <div className="gate-body">
-            <div className="login-head">
-              <span className="login-icon">
-                <i className="fa-solid fa-right-left" aria-hidden="true" />
-              </span>
-              <h2>¿A dónde quieres entrar?</h2>
-              <p className="login-desc">
-                {profile?.nombre ? `Hola, ${profile.nombre}. ` : 'Tu cuenta '}tiene acceso a dos
-                portales. Elige uno para continuar.
-              </p>
-            </div>
 
-            <div style={{ display: 'grid', gap: 12 }}>
-              {OPCIONES.map((opcion) => (
-                <button
-                  key={opcion.rol}
-                  type="button"
-                  className="rol-card"
-                  onClick={() => elegir(opcion.rol)}
-                >
-                  <span className={`rol-icon ${opcion.claseIcono}`}>
-                    <i className={opcion.icono} aria-hidden="true" />
-                  </span>
-                  <span className="rol-txt">
-                    <strong>{opcion.titulo}</strong>
-                    <span>{opcion.descripcion}</span>
-                  </span>
-                  <i className="fa-solid fa-chevron-right" aria-hidden="true" />
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-ghost btn-block"
-              style={{ marginTop: 16 }}
-              onClick={() => void signOut()}
-            >
-              <i className="fa-solid fa-arrow-right-from-bracket" aria-hidden="true" />
-              Cerrar sesión
-            </button>
+          <div className="mt-7 space-y-2.5 border-t border-line pt-6">
+            {OPCIONES.map((opcion) => (
+              <button
+                key={opcion.rol}
+                type="button"
+                onClick={() => elegir(opcion.rol)}
+                className="group flex w-full items-center gap-4 rounded-xl border border-line bg-white p-4 text-left transition hover:border-ink/25"
+              >
+                <i className={`${opcion.icono} text-lg text-brand`} aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <strong className="block text-sm font-bold text-ink">{opcion.titulo}</strong>
+                  <span className="mt-0.5 block text-xs text-ink/45">{opcion.descripcion}</span>
+                </span>
+                <i
+                  className="fa-solid fa-chevron-right text-xs text-ink/20 transition group-hover:translate-x-0.5 group-hover:text-brand"
+                  aria-hidden="true"
+                />
+              </button>
+            ))}
           </div>
+
+          <button
+            type="button"
+            className="btn btn-ghost btn-block mt-5"
+            onClick={() => void signOut()}
+          >
+            <i className="fa-solid fa-arrow-right-from-bracket" aria-hidden="true" />
+            Cerrar sesión
+          </button>
         </div>
       </div>
     </div>

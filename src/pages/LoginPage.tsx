@@ -1,37 +1,10 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import LoadingScreen from '../components/LoadingScreen'
+import PantallaEstado from '../components/PantallaEstado'
 import { useAuth } from '../context/AuthContext'
 import { HOME_POR_ROLE } from '../lib/portal'
 import { rolesOf } from '../lib/types'
-
-function NoAccess({ message, onSignOut }: { message: string; onSignOut: () => Promise<void> }) {
-  return (
-    <div className="gate-shell">
-      <div className="app">
-        <div className="card gate-card">
-          <div className="gate-head">
-            <img className="gate-logo" src="/logo-dce.png" alt="Logo de Ingenierías" />
-          </div>
-          <div className="gate-body">
-            <div className="gate-title" style={{ marginBottom: 14 }}>
-              <h1>Sin acceso</h1>
-              <p>Prácticas profesionales</p>
-            </div>
-            <div className="alert alert-danger">
-              <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
-              <span>{message}</span>
-            </div>
-            <button type="button" className="btn btn-dark btn-block" onClick={() => void onSignOut()}>
-              <i className="fa-solid fa-arrow-right-from-bracket" aria-hidden="true" />
-              Cerrar sesión
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function GoogleIcon() {
   return (
@@ -60,25 +33,34 @@ export default function LoginPage() {
   const { session, profile, loading, profileLoading, error, signInWithGoogle, signOut } = useAuth()
   const [signingIn, setSigningIn] = useState(false)
 
-  if (loading || (session && profileLoading)) return <LoadingScreen />
+  if (loading || (session && profileLoading)) return <LoadingScreen fondo="marco" />
 
   if (session) {
     if (profile) {
       const roles = rolesOf(profile)
       if (roles.length > 1) return <Navigate to="/elegir-portal" replace />
       if (roles.length === 1) return <Navigate to={HOME_POR_ROLE[roles[0]]} replace />
-      return (
-        <NoAccess
-          message="Tu usuario no tiene un rol asignado. Contacta a la coordinación."
-          onSignOut={signOut}
-        />
-      )
     }
     return (
-      <NoAccess
-        message="Tu correo no está registrado en la base de datos de la institución."
-        onSignOut={signOut}
-      />
+      <div className="degradado-marco relative flex min-h-dvh items-center justify-center overflow-hidden px-5 py-12">
+        <div className="relative w-full max-w-md">
+          <PantallaEstado
+            icono="fa-solid fa-circle-exclamation"
+            tono="danger"
+            titulo="Sin acceso"
+            descripcion={
+              profile
+                ? 'Tu usuario no tiene un rol asignado. Contacta a la coordinación.'
+                : 'Tu correo no está registrado en la base de datos de la institución.'
+            }
+          >
+            <button type="button" className="btn btn-dark btn-block" onClick={() => void signOut()}>
+              <i className="fa-solid fa-arrow-right-from-bracket" aria-hidden="true" />
+              Cerrar sesión
+            </button>
+          </PantallaEstado>
+        </div>
+      </div>
     )
   }
 
@@ -89,34 +71,31 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="gate-shell">
-      <div className="app">
-        <div className="card gate-card">
-          <div className="gate-head">
-            <img className="gate-logo" src="/logo-dce.png" alt="Logo de Ingenierías" />
+    <div className="degradado-marco relative flex min-h-dvh items-center justify-center overflow-hidden px-5 py-12">
+      <div className="relative w-full max-w-sm">
+        <div className="card flex min-h-[21rem] flex-col justify-center gap-7 rounded-2xl bg-paper p-7 shadow-lift sm:p-8">
+          <div className="text-center">
+            <img src="/logo-dce.png" alt="ISND" className="mx-auto h-9 w-auto" />
+            <p className="mt-4 text-[0.62rem] font-bold tracking-[0.18em] text-brand uppercase">
+              Prácticas profesionales
+            </p>
           </div>
-          <div className="gate-body">
-            <div className="login-head">
-              <span className="login-icon">
-                <i className="fa-solid fa-lock" aria-hidden="true" />
-              </span>
-              <h2>Iniciar sesión</h2>
-              <p className="login-desc">
-                Accede con tu cuenta institucional <strong>@iest.edu.mx</strong> para solicitar y
-                consultar tus documentos de prácticas.
-              </p>
-            </div>
+
+          <div className="border-t border-line pt-7">
+            <h1 className="text-xl font-extrabold tracking-tight text-ink">Inicia sesión</h1>
+            <p className="mt-1.5 text-sm text-ink/50">
+              Cuenta institucional <span className="text-ink/70">@iest.edu.mx</span>
+            </p>
 
             <button
               type="button"
-              className="btn btn-google btn-block"
+              className="btn btn-outline btn-lg btn-block mt-6"
               onClick={() => void handleLogin()}
               disabled={signingIn}
-              style={{ minHeight: 48 }}
             >
               {signingIn ? (
                 <>
-                  <span className="spinner spinner-dark" aria-hidden="true" />
+                  <span className="spinner text-ink/50" aria-hidden="true" />
                   Redirigiendo…
                 </>
               ) : (
@@ -128,8 +107,8 @@ export default function LoginPage() {
             </button>
 
             {error && (
-              <div className="alert alert-danger" style={{ marginTop: 14 }}>
-                <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
+              <div className="alerta bg-danger-soft text-danger mt-4">
+                <i className="fa-solid fa-circle-exclamation mt-0.5 shrink-0" aria-hidden="true" />
                 <span>{error}</span>
               </div>
             )}

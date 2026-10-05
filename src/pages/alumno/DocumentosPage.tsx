@@ -1,13 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import Alerta from '../../components/Alerta'
+import EstadoBadge from '../../components/EstadoBadge'
+import PageHeader from '../../components/PageHeader'
 import { useAuth } from '../../context/AuthContext'
 import { DOCUMENTOS, type CodigoDocumento } from '../../lib/documentos'
 import { cartaCompletadaPorEmpresa } from '../../lib/empresa'
-import {
-  buscarProcesoConDocumentos,
-  type EstadoProceso,
-  type ProcesoConDocumentos,
-} from '../../lib/procesos'
+import { buscarProcesoConDocumentos, type ProcesoConDocumentos } from '../../lib/procesos'
 
 const CARTA_HREF = '/alumno/solicitud/carta-aceptacion'
 
@@ -17,23 +16,12 @@ const ICONOS_DOCUMENTO: Record<CodigoDocumento, string> = {
   cierre: 'fa-solid fa-flag-checkered',
 }
 
-const COLORES_DOCUMENTO: Record<CodigoDocumento, string> = {
-  carta_aceptacion: 'd-carta',
-  avance: 'd-avance',
-  cierre: 'd-cierre',
+const BADGE_RECHAZADA = {
+  clase: 'bg-danger-soft text-danger',
+  etiqueta: 'Rechazada',
 }
-
-const ESTILOS_BADGE: Record<EstadoProceso, string> = {
-  pendiente: 'b-pendiente',
-  aceptada: 'b-atendido',
-  rechazada: 'b-rechazada',
-}
-
-const ETIQUETAS_ESTADO: Record<EstadoProceso, string> = {
-  pendiente: 'Pendiente',
-  aceptada: 'Aceptada',
-  rechazada: 'Rechazada',
-}
+const BADGE_ATENDIDA = { clase: 'bg-ok-soft text-ok', etiqueta: 'Aceptada' }
+const BADGE_PENDIENTE = { clase: 'bg-warn-soft text-warn', etiqueta: 'En revisión' }
 
 interface Tarjeta {
   badge: { clase: string; etiqueta: string } | null
@@ -41,10 +29,6 @@ interface Tarjeta {
   accion: string
   href: string
 }
-
-const BADGE_RECHAZADA = { clase: 'b-rechazada', etiqueta: 'Rechazada' }
-const BADGE_ATENDIDA = { clase: 'b-atendido', etiqueta: 'Aceptada' }
-const BADGE_PENDIENTE = { clase: 'b-pendiente', etiqueta: 'En revisión' }
 
 function evaluarTarjeta(
   proceso: ProcesoConDocumentos | null | undefined,
@@ -116,10 +100,6 @@ function evaluarTarjeta(
   return { badge: null, texto: doc.descripcion, accion: 'Solicitar', href: doc.href }
 }
 
-function BadgeEstado({ estado }: { estado: EstadoProceso }) {
-  return <span className={`badge ${ESTILOS_BADGE[estado]}`}>{ETIQUETAS_ESTADO[estado]}</span>
-}
-
 export default function DocumentosPage() {
   const { profile } = useAuth()
   const alumnoId = profile?.id
@@ -132,115 +112,99 @@ export default function DocumentosPage() {
 
   const cartaDelProceso = proceso?.solicitudes.find((s) => s.documento === 'carta_aceptacion')
   const cartaLista = cartaCompletadaPorEmpresa(cartaDelProceso?.datos)
+  const avance = Math.round((proceso?.solicitudes.length ?? 0) / DOCUMENTOS.length * 100)
 
   return (
     <div>
-      <div className="top">
-        <div className="head-row">
-          <div className="head-icon">
-            <i className="fa-solid fa-folder-open" aria-hidden="true" />
-          </div>
-          <div className="head-text">
-            <h1>Mis documentos</h1>
-            <span className="head-sub">Portal del alumno</span>
-          </div>
-        </div>
+      <PageHeader
+        icono="fa-solid fa-folder-open"
+        titulo="Mis documentos"
+        eyebrow="Portal del alumno"
+        meta={
+          proceso && (
+            <>
+              <span className="etiqueta">
+                <i className="fa-solid fa-hashtag" aria-hidden="true" />
+                <span className="font-mono">{proceso.folio}</span>
+              </span>
+              <span className="etiqueta">
+                {proceso.solicitudes.length} de {DOCUMENTOS.length} documentos
+              </span>
+              <EstadoBadge estado={proceso.estado} />
+            </>
+          )
+        }
+      />
 
-        {proceso && (
-          <div className="head-meta">
-            <span className="tag">
-              <i className="fa-solid fa-hashtag" aria-hidden="true" />
-              <span style={{ fontFamily: 'var(--font-mono)' }}>{proceso.folio}</span>
-            </span>
-            <span className="meta-date">
-              {proceso.solicitudes.length} de {DOCUMENTOS.length} documentos
-            </span>
-            <BadgeEstado estado={proceso.estado} />
-          </div>
+      <div className="space-y-4">
+        {!proceso && (
+          <Alerta icono="fa-solid fa-circle-info" tono="info" titulo="Para comenzar, solicita tu carta de aceptación">
+            Con ella se abre tu proceso; después podrás enviar el avance y el cierre con los mismos datos.
+          </Alerta>
+        )}
+
+        {proceso?.estado === 'rechazada' && (
+          <Alerta icono="fa-solid fa-triangle-exclamation" tono="warn" titulo="Tu proceso fue rechazado">
+            Solicita de nuevo la carta de aceptación para abrir un proceso nuevo.
+          </Alerta>
+        )}
+
+        {proceso?.estado === 'pendiente' && !cartaLista && (
+          <Alerta icono="fa-solid fa-building" tono="info" titulo="Carta pendiente de la empresa">
+            Avance y cierre se desbloquean cuando la empresa complete giro, tamaño, fechas, horarios y
+            directivo.
+          </Alerta>
         )}
       </div>
 
-      <p className="quiet" style={{ marginTop: -8 }}>
-        Cada proceso agrupa tus 3 documentos: carta de aceptación, avance y cierre.
-      </p>
-
-      {!proceso && (
-        <div className="alert alert-info">
-          <i className="fa-solid fa-circle-info" aria-hidden="true" />
-          <span>
-            <strong style={{ display: 'block' }}>Para comenzar, solicita tu carta de aceptación</strong>
-            Con ella se abre tu proceso; después podrás enviar el avance y el cierre con los mismos
-            datos.
-          </span>
-        </div>
-      )}
-
-      {proceso?.estado === 'rechazada' && (
-        <div className="alert alert-warn">
-          <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
-          <span>
-            <strong style={{ display: 'block' }}>Tu proceso fue rechazado</strong>
-            Solicita de nuevo la carta de aceptación para abrir un proceso nuevo.
-          </span>
-        </div>
-      )}
-
-      {proceso?.estado === 'pendiente' && !cartaLista && (
-        <div className="alert alert-info">
-          <i className="fa-solid fa-building" aria-hidden="true" />
-          <span>
-            <strong style={{ display: 'block' }}>Carta pendiente de la empresa</strong>
-            Avance y cierre se desbloquean cuando la empresa complete giro, tamaño, fechas,
-            horarios y directivo.
-          </span>
-        </div>
-      )}
-
       {proceso && (
-        <div className="card card-pad" style={{ marginBottom: 18 }}>
+        <div
+          className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-ink/8"
+          role="progressbar"
+          aria-valuenow={avance}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${proceso.solicitudes.length} de ${DOCUMENTOS.length} documentos`}
+        >
           <div
-            className="bar"
-            style={{ height: 6 }}
-            title={`${proceso.solicitudes.length} de ${DOCUMENTOS.length} documentos`}
-          >
-            <span
-              className="bar-total"
-              style={{
-                display: 'block',
-                height: '100%',
-                width: `${(proceso.solicitudes.length / DOCUMENTOS.length) * 100}%`,
-                background: 'var(--accent)',
-                borderRadius: 'var(--r-pill)',
-                transition: 'width .6s var(--ease-spring)',
-              }}
-            />
-          </div>
+            className="h-full rounded-full bg-brand-deep transition-[width] duration-500"
+            style={{ width: `${avance}%` }}
+          />
         </div>
       )}
 
-      <div className="doc-grid">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {DOCUMENTOS.map((doc, index) => {
           const tarjeta = evaluarTarjeta(proceso, doc)
           return (
-            <Link key={doc.codigo} to={tarjeta.href} className="card hover-lift doc-card">
-              <div className="doc-top">
-                <span className={`doc-icon-box ${COLORES_DOCUMENTO[doc.codigo]}`}>
-                  <i className={ICONOS_DOCUMENTO[doc.codigo]} aria-hidden="true" />
-                </span>
-                <div className="doc-info">
-                  <span className="doc-paso">
+            <Link
+              key={doc.codigo}
+              to={tarjeta.href}
+              className="card group flex flex-col gap-3.5 p-5 transition hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-lift"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-ink/40">
                     Paso {index + 1} de {DOCUMENTOS.length}
-                  </span>
-                  <h2>{doc.titulo}</h2>
+                  </p>
+                  <h2 className="mt-1 flex items-center gap-2.5 text-base font-bold text-ink">
+                    <i className={`${ICONOS_DOCUMENTO[doc.codigo]} text-brand`} aria-hidden="true" />
+                    {doc.titulo}
+                  </h2>
                 </div>
                 {tarjeta.badge && (
                   <span className={`badge ${tarjeta.badge.clase}`}>{tarjeta.badge.etiqueta}</span>
                 )}
               </div>
-              <p className="doc-desc">{tarjeta.texto}</p>
-              <span className="doc-cta">
+
+              <p className="flex-1 text-sm leading-relaxed text-ink/55">{tarjeta.texto}</p>
+
+              <span className="inline-flex items-center gap-2 text-[0.7rem] font-bold uppercase tracking-[0.08em] text-brand">
                 {tarjeta.accion || 'Ver detalle'}
-                <i className="fa-solid fa-arrow-right" aria-hidden="true" />
+                <i
+                  className="fa-solid fa-arrow-right transition-transform group-hover:translate-x-1"
+                  aria-hidden="true"
+                />
               </span>
             </Link>
           )

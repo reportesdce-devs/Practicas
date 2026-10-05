@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import PantallaEstado from './PantallaEstado'
 
 interface Props {
   children: ReactNode
@@ -29,43 +30,30 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (!error) return this.props.children
 
     return (
-      <div className="gate-shell">
-        <div className="app">
-          <div className="card gate-card">
-            <div className="gate-head">
-              <img className="gate-logo" src="/logo-dce.png" alt="Logo de Ingenierías" />
-            </div>
-            <div className="gate-body">
-              <div className="gate-title" style={{ marginBottom: 14 }}>
-                <h1>Algo salió mal</h1>
-                <p>Prácticas profesionales</p>
-              </div>
-              <div className="alert alert-danger">
-                <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
-                <span>Ocurrió un error inesperado. Puedes intentar de nuevo o recargar la página.</span>
-              </div>
-              <p
-                className="error"
-                style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)' }}
-              >
-                {error.message}
-              </p>
-              <div className="field" style={{ display: 'flex', gap: 10 }}>
-                <button type="button" className="btn btn-primary" onClick={this.reiniciar}>
-                  <i className="fa-solid fa-rotate-right" aria-hidden="true" />
-                  Reintentar
-                </button>
-                <button type="button" className="btn" onClick={() => window.location.reload()}>
-                  <i className="fa-solid fa-arrows-rotate" aria-hidden="true" />
-                  Recargar
-                </button>
-              </div>
-              <Link to="/" className="btn btn-ghost btn-block" style={{ marginTop: 12 }}>
-                Ir al inicio
-              </Link>
-            </div>
+      <div className="flex min-h-dvh items-center justify-center bg-paper px-5">
+        <PantallaEstado
+          icono="fa-solid fa-triangle-exclamation"
+          tono="danger"
+          titulo="Algo salió mal"
+          descripcion="Ocurrió un error inesperado. Puedes intentar de nuevo o recargar la página."
+        >
+          <pre className="max-h-40 overflow-auto rounded-lg bg-ink/5 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-ink/60">
+            {error.message}
+          </pre>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button type="button" className="btn btn-primary" onClick={this.reiniciar}>
+              <i className="fa-solid fa-rotate-right" aria-hidden="true" />
+              Reintentar
+            </button>
+            <button type="button" className="btn btn-outline" onClick={() => window.location.reload()}>
+              <i className="fa-solid fa-arrows-rotate" aria-hidden="true" />
+              Recargar
+            </button>
           </div>
-        </div>
+          <Link to="/" className="btn btn-ghost btn-block">
+            Ir al inicio
+          </Link>
+        </PantallaEstado>
       </div>
     )
   }

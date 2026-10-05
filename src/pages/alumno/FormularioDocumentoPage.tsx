@@ -1,14 +1,18 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useState } from 'react'
+﻿import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
+import Alerta from '../../components/Alerta'
 import FormField from '../../components/form/FormField'
 import { Select, TextInput } from '../../components/form/inputs'
+import PageHeader from '../../components/PageHeader'
+import PantallaEstado, { type TonoEstado } from '../../components/PantallaEstado'
 import { useAuth } from '../../context/AuthContext'
 import type { CodigoDocumento } from '../../lib/documentos'
+import { cartaCompletadaPorEmpresa, type EstadoEmpresa } from '../../lib/empresa'
+import { formatearFecha, iniciales } from '../../lib/formato'
 import { avisarNuevoProceso } from '../../lib/notificaciones'
 import { buscarProcesoPeriodo } from '../../lib/procesos'
-import { cartaCompletadaPorEmpresa, type EstadoEmpresa } from '../../lib/empresa'
 import {
   datosDocumentoDefault,
   datosDocumentoSchema,
@@ -38,40 +42,207 @@ const PASO_DOCUMENTO: Record<CodigoDocumento, number> = {
 }
 
 const TITULOS_DOCUMENTO: Record<CodigoDocumento, string> = {
-  carta_aceptacion: 'Carta de aceptación',
+  carta_aceptacion: 'Carta de aceptaciÃ³n',
   avance: 'Avance',
   cierre: 'Cierre',
 }
 
-function iniciales(nombre: string): string {
-  return nombre
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((palabra) => palabra.charAt(0))
-    .join('')
-    .toUpperCase()
+/* -------------------------------------------------------------------------- */
+/* Piezas de presentaciÃ³n                                                      */
+/* -------------------------------------------------------------------------- */
+
+function Encabezado({
+  icono,
+  titulo,
+  eyebrow,
+  paso,
+  folio,
+}: {
+  icono: string
+  titulo: string
+  eyebrow: string
+  paso: number
+  folio: string | null
+}) {
+  return (
+    <PageHeader
+      icono={icono}
+      titulo={titulo}
+      eyebrow={eyebrow}
+      meta={
+        <>
+          <span className="etiqueta">Paso {paso} de 3</span>
+          {folio && (
+            <span className="etiqueta">
+              <i className="fa-solid fa-hashtag" aria-hidden="true" />
+              <span className="font-mono">{folio}</span>
+            </span>
+          )}
+          <Link to="/alumno/documentos" className="btn btn-ghost btn-sm">
+            <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+            Volver
+          </Link>
+        </>
+      }
+    />
+  )
+}
+
+function Seccion({
+  icono,
+  titulo,
+  accion,
+  children,
+}: {
+  icono: string
+  titulo: string
+  accion?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="card p-5 sm:p-6">
+      <div className="mb-5 flex items-center gap-2.5 border-b border-line pb-3.5">
+        <i className={`${icono} text-base text-brand`} aria-hidden="true" />
+        <h2 className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-ink">{titulo}</h2>
+        {accion && <div className="ml-auto">{accion}</div>}
+      </div>
+      {children}
+    </section>
+  )
 }
 
 function TarjetaAlumno({ profile }: { profile: Persona }) {
   return (
-    <section className="card alumno-card">
-      <span className="alumno-avatar">{iniciales(profile.nombre)}</span>
-      <div className="alumno-info">
-        <span className="alumno-rol">Alumno</span>
-        <strong className="alumno-nombre">{profile.nombre}</strong>
-        <span className="alumno-carrera">
+    <section className="card flex flex-wrap items-center gap-4 p-5">
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-ink text-sm font-bold text-white">
+        {iniciales(profile.nombre)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-brand">Alumno</p>
+        <p className="mt-0.5 text-base font-bold text-ink">{profile.nombre}</p>
+        <p className="mt-0.5 flex items-center gap-2 text-xs text-ink/50">
           <i className="fa-solid fa-graduation-cap" aria-hidden="true" />
-          {profile.carreras?.nombre ?? '—'}
-        </span>
+          {profile.carreras?.nombre ?? 'â€”'}
+        </p>
       </div>
-      <div className="alumno-id">
-        <span className="dato-label">ID</span>
-        <span className="alumno-id-valor">{profile.id}</span>
-      </div>
+      <span className="etiqueta shrink-0">
+        <span className="text-ink/40">ID</span>
+        <span className="font-mono">{profile.id}</span>
+      </span>
     </section>
   )
 }
+
+function PantallaDocumento({
+  icono,
+  tono,
+  titulo,
+  texto,
+}: {
+  icono: string
+  tono: TonoEstado
+  titulo: string
+  texto: string
+}) {
+  return (
+    <PantallaEstado icono={icono} tono={tono} titulo={titulo} descripcion={texto}>
+      <Link to="/alumno/documentos" className="btn btn-primary btn-block">
+        Volver a mis documentos
+      </Link>
+    </PantallaEstado>
+  )
+}
+
+function BloqueActividades({
+  fields,
+  registrar,
+  onQuitar,
+  errorDe,
+  errorLista,
+  deshabilitado,
+  hint,
+}: {
+  fields: { id: string }[]
+  registrar: (index: number) => object
+  onQuitar: (index: number) => void
+  errorDe: (index: number) => string | undefined
+  errorLista?: string
+  deshabilitado: boolean
+  hint?: string
+}) {
+  return (
+    <>
+      {hint && <p className="-mt-1 mb-4 text-xs leading-relaxed text-ink/45">{hint}</p>}
+      <div className="space-y-3">
+        {fields.map((field, index) => (
+          <div key={field.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+            <FormField label={`Actividad ${index + 1}`} required error={errorDe(index)}>
+              <TextInput
+                {...registrar(index)}
+                placeholder="Ej. Desarrollo y documentaciÃ³n de soluciones digitales"
+                disabled={deshabilitado}
+              />
+            </FormField>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => onQuitar(index)}
+              disabled={fields.length === 1 || deshabilitado}
+            >
+              <i className="fa-solid fa-xmark" aria-hidden="true" />
+              Quitar
+            </button>
+          </div>
+        ))}
+      </div>
+      {errorLista && <p className="mt-3 text-xs font-semibold text-danger">{errorLista}</p>}
+    </>
+  )
+}
+
+function BotonEnviar({ isSubmitting }: { isSubmitting: boolean }) {
+  return (
+    <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+      {isSubmitting ? (
+        <>
+          <span className="spinner" aria-hidden="true" />
+          Enviandoâ€¦
+        </>
+      ) : (
+        <>
+          <i className="fa-solid fa-paper-plane" aria-hidden="true" />
+          Enviar solicitud
+        </>
+      )}
+    </button>
+  )
+}
+
+function Cargando({ icono, titulo }: { icono: string; titulo: string }) {
+  return (
+    <div>
+      <PageHeader
+        icono={icono}
+        titulo={titulo}
+        eyebrow="Solicitud de documento"
+        meta={
+          <Link to="/alumno/documentos" className="btn btn-ghost btn-sm">
+            <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+            Volver
+          </Link>
+        }
+      />
+      <div className="card flex items-center gap-3 p-5 text-sm text-ink/55">
+        <span className="spinner text-brand" aria-hidden="true" />
+        Verificando tu proceso de prÃ¡cticasâ€¦
+      </div>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Transformaciones de datos guardados                                          */
+/* -------------------------------------------------------------------------- */
 
 function cartaAFormulario(datos: Record<string, unknown>): SolicitudCartaAlumno {
   const actividades = Array.isArray(datos['actividades'])
@@ -103,57 +274,9 @@ function datosAFormulario(datos: DatosDocumentoGuardados): DatosDocumento {
   }
 }
 
-function formatearFecha(iso: string): string {
-  return new Intl.DateTimeFormat('es-MX', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(iso))
-}
-
-function MensajeEstado({
-  titulo,
-  texto,
-  exito = false,
-}: {
-  titulo: string
-  texto: string
-  exito?: boolean
-}) {
-  return (
-    <div>
-      <Link to="/alumno/documentos" className="btn btn-ghost btn-sm">
-        <i className="fa-solid fa-arrow-left" aria-hidden="true" />
-        Volver a documentos
-      </Link>
-      <div className="card gate-card" style={{ marginTop: 14 }}>
-        <div className="gate-head">
-          <span
-            className="logo logo-lg"
-            style={{ background: exito ? 'var(--ok)' : 'var(--accent)' }}
-          >
-            <i
-              className={exito ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-info'}
-              aria-hidden="true"
-            />
-          </span>
-          <div className="gate-title">
-            <h1>{titulo}</h1>
-            <p>Solicitud de documento</p>
-          </div>
-        </div>
-        <div className="gate-body">
-          <p className="quiet" style={{ textAlign: 'center' }}>
-            {texto}
-          </p>
-          <Link to="/alumno/documentos" className="btn btn-primary btn-block">
-            Volver a documentos
-          </Link>
-        </div>
-      </div>
-    </div>
-  )
-}
+/* -------------------------------------------------------------------------- */
+/* Carta de aceptaciÃ³n: lo captura el alumno                                   */
+/* -------------------------------------------------------------------------- */
 
 function FormularioCartaAlumno({ profile }: { profile: Persona }) {
   const [estado, setEstado] = useState<Estado>('cargando')
@@ -178,6 +301,7 @@ function FormularioCartaAlumno({ profile }: { profile: Persona }) {
 
   const { fields, append, remove } = useFieldArray({ control, name: 'actividades' })
   const soloLectura = estado === 'pendiente' || estado === 'aceptada'
+  const bloqueado = soloLectura || isSubmitting
 
   useEffect(() => {
     let cancelado = false
@@ -230,246 +354,162 @@ function FormularioCartaAlumno({ profile }: { profile: Persona }) {
   })
 
   if (estado === 'cargando') {
-    return (
-      <div>
-        <Link to="/alumno/documentos" className="btn btn-ghost btn-sm">
-          <i className="fa-solid fa-arrow-left" aria-hidden="true" />
-          Volver a documentos
-        </Link>
-        <p className="quiet field" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span className="spinner spinner-dark" aria-hidden="true" />
-          Verificando tu proceso de prácticas…
-        </p>
-      </div>
-    )
+    return <Cargando icono={ICONOS_DOCUMENTO.carta_aceptacion} titulo="Carta de aceptaciÃ³n" />
   }
 
   if (estado === 'enviada') {
     return (
-      <MensajeEstado
-        exito
+      <PantallaDocumento
+        icono="fa-solid fa-circle-check"
+        tono="ok"
         titulo="Solicitud enviada"
-        texto={`Tu carta del proceso ${folio ?? ''} quedó pendiente de confirmación por la coordinación. Después la empresa completará los datos faltantes.`}
+        texto={`Tu carta del proceso ${folio ?? ''} quedÃ³ pendiente de confirmaciÃ³n por la coordinaciÃ³n. DespuÃ©s la empresa completarÃ¡ los datos faltantes.`}
       />
     )
   }
 
   return (
     <div>
-      <div className="top">
-        <div className="head-row">
-          <div className="head-icon">
-            <i className="fa-solid fa-envelope" aria-hidden="true" />
-          </div>
-          <div className="head-text">
-            <h1>Carta de aceptación</h1>
-            <span className="head-sub">Solicitud de documento</span>
-          </div>
-        </div>
-        <div className="head-meta">
-          <span className="meta-date">Paso 1 de 3</span>
-          {folio && (
-            <span className="tag">
-              <i className="fa-solid fa-hashtag" aria-hidden="true" />
-              <span style={{ fontFamily: 'var(--font-mono)' }}>{folio}</span>
-            </span>
-          )}
-          <Link to="/alumno/documentos" className="btn btn-ghost btn-sm">
-            Volver
-          </Link>
-        </div>
-      </div>
+      <Encabezado
+        icono={ICONOS_DOCUMENTO.carta_aceptacion}
+        titulo={TITULOS_DOCUMENTO.carta_aceptacion}
+        eyebrow="Solicitud de documento"
+        paso={PASO_DOCUMENTO.carta_aceptacion}
+        folio={folio}
+      />
 
-      {soloLectura && estado !== 'aceptada' && empresaEstado === 'no_enviada' && (
-        <div className="alert alert-warn">
-          <i className="fa-solid fa-hourglass-half" aria-hidden="true" />
-          <span>
-            <strong style={{ display: 'block' }}>Pendiente de confirmación por la coordinación{creadoEn ? ` · enviada el ${formatearFecha(creadoEn)}` : ''}</strong>
-            Cuando la coordinación confirme, se enviará un enlace temporal a la empresa.
-          </span>
-        </div>
-      )}
+      <div className="space-y-4">
+        {soloLectura && estado !== 'aceptada' && empresaEstado === 'no_enviada' && (
+          <Alerta
+            icono="fa-solid fa-hourglass-half"
+            tono="warn"
+            titulo={`Pendiente de confirmaciÃ³n por la coordinaciÃ³n${creadoEn ? ` Â· enviada el ${formatearFecha(creadoEn)}` : ''}`}
+          >
+            Cuando la coordinaciÃ³n confirme, se enviarÃ¡ un enlace temporal a la empresa.
+          </Alerta>
+        )}
 
-      {soloLectura && estado !== 'aceptada' && empresaEstado === 'enviada' && (
-        <div className="alert alert-info">
-          <i className="fa-solid fa-paper-plane" aria-hidden="true" />
-          <span>
-            <strong style={{ display: 'block' }}>Enlace enviado a la empresa</strong>
+        {soloLectura && estado !== 'aceptada' && empresaEstado === 'enviada' && (
+          <Alerta icono="fa-solid fa-paper-plane" tono="info" titulo="Enlace enviado a la empresa">
             La empresa debe completar los datos faltantes
             {empresaExpira ? ` antes del ${formatearFecha(empresaExpira)}` : ''}.
-          </span>
-        </div>
-      )}
-
-      {soloLectura && estado !== 'aceptada' && empresaEstado === 'completada' && (
-        <div className="alert alert-ok">
-          <i className="fa-solid fa-circle-check" aria-hidden="true" />
-          <span>
-            <strong style={{ display: 'block' }}>Carta completa</strong>
-            La empresa ya completó los datos. Puedes solicitar avance y cierre.
-          </span>
-        </div>
-      )}
-
-      {soloLectura && estado === 'aceptada' && (
-        <div className="alert alert-ok">
-          <i className="fa-solid fa-circle-check" aria-hidden="true" />
-          <span>
-            <strong style={{ display: 'block' }}>Solicitud aceptada</strong>
-            La coordinación aprobó tu proceso. No es posible modificar los datos.
-          </span>
-        </div>
-      )}
-
-      {errorEnvio && (
-        <div className="error">
-          <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
-          <span>{errorEnvio}</span>
-        </div>
-      )}
-
-      <form onSubmit={onSubmit}>
-        <TarjetaAlumno profile={profile} />
-
-        <section className="card card-pad" style={{ marginTop: 14 }}>
-          <div className="form-card-head">
-            <span className="sec-icon i-empresa">
-              <i className="fa-solid fa-building" aria-hidden="true" />
-            </span>
-            <h2>Empresa</h2>
-          </div>
-          <div className="form-row">
-            <FormField label="Empresa" required error={errors.empresa?.message}>
-              <TextInput
-                {...register('empresa')}
-                placeholder="Ej. Empresa Demo, S.A. de C.V."
-                disabled={soloLectura || isSubmitting}
-              />
-            </FormField>
-            <FormField label="Lugar" required error={errors.lugar?.message}>
-              <TextInput
-                {...register('lugar')}
-                placeholder="Ej. Altamira, Tamaulipas"
-                disabled={soloLectura || isSubmitting}
-              />
-            </FormField>
-          </div>
-        </section>
-
-        <section className="card card-pad" style={{ marginTop: 14 }}>
-          <div className="form-card-head">
-            <span className="sec-icon i-supervision">
-              <i className="fa-solid fa-user-tie" aria-hidden="true" />
-            </span>
-            <h2>Supervisor</h2>
-          </div>
-          <div className="form-row">
-            <FormField label="Supervisor" required error={errors.supervisor?.message}>
-              <TextInput
-                {...register('supervisor')}
-                placeholder="Ej. Ing. Andrea Morales"
-                disabled={soloLectura || isSubmitting}
-              />
-            </FormField>
-            <FormField label="Puesto del supervisor" required error={errors.puestoSupervisor?.message}>
-              <TextInput
-                {...register('puestoSupervisor')}
-                placeholder="Ej. Líder de Proyectos Digitales"
-                disabled={soloLectura || isSubmitting}
-              />
-            </FormField>
-            <FormField label="Correo del supervisor" required error={errors.correoSupervisor?.message}>
-              <TextInput
-                type="email"
-                {...register('correoSupervisor')}
-                placeholder="Ej. supervisor@empresa.com"
-                disabled={soloLectura || isSubmitting}
-              />
-            </FormField>
-          </div>
-          <p className="field-hint">
-            A este correo llegará el enlace temporal para que la empresa complete giro, tamaño,
-            fechas, horarios y directivo.
-          </p>
-        </section>
-
-        <section className="card card-pad" style={{ marginTop: 14 }}>
-          <div className="form-card-head">
-            <span className="sec-icon i-actividades">
-              <i className="fa-solid fa-list-check" aria-hidden="true" />
-            </span>
-            <h2>Actividades</h2>
-            <button
-              type="button"
-              className="btn btn-sm accion"
-              onClick={() => append({ valor: '' })}
-              disabled={soloLectura || isSubmitting}
-            >
-              <i className="fa-solid fa-plus" aria-hidden="true" />
-              Agregar
-            </button>
-          </div>
-          <div className="field">
-            {fields.map((field, index) => (
-              <div key={field.id} className="form-row" style={{ alignItems: 'flex-end', marginBottom: 12 }}>
-                <FormField
-                  label={`Actividad ${index + 1}`}
-                  required
-                  error={errors.actividades?.[index]?.valor?.message}
-                >
-                  <TextInput
-                    {...register(`actividades.${index}.valor`)}
-                    placeholder="Ej. Desarrollo y documentación de soluciones digitales"
-                    disabled={soloLectura || isSubmitting}
-                  />
-                </FormField>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => remove(index)}
-                  disabled={fields.length === 1 || soloLectura || isSubmitting}
-                >
-                  <i className="fa-solid fa-xmark" aria-hidden="true" />
-                  Quitar
-                </button>
-              </div>
-            ))}
-          </div>
-          {errors.actividades?.message && (
-            <p className="field-hint" style={{ color: 'var(--danger)', fontWeight: 700 }}>
-              {errors.actividades.message}
-            </p>
-          )}
-        </section>
-
-        {!soloLectura && (
-          <div
-            className="card card-pad field"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}
-          >
-            <p className="quiet" style={{ margin: 0, fontSize: '0.8rem' }}>
-              <i className="fa-solid fa-circle-info" aria-hidden="true" /> Al enviar se abre tu
-              proceso y la coordinación confirmará antes de avisar a la empresa.
-            </p>
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <span className="spinner" aria-hidden="true" />
-                  Enviando…
-                </>
-              ) : (
-                <>
-                  <i className="fa-solid fa-paper-plane" aria-hidden="true" />
-                  Enviar solicitud
-                </>
-              )}
-            </button>
-          </div>
+          </Alerta>
         )}
-      </form>
+
+        {soloLectura && estado !== 'aceptada' && empresaEstado === 'completada' && (
+          <Alerta icono="fa-solid fa-circle-check" tono="ok" titulo="Carta completa">
+            La empresa ya completÃ³ los datos. Puedes solicitar avance y cierre.
+          </Alerta>
+        )}
+
+        {soloLectura && estado === 'aceptada' && (
+          <Alerta icono="fa-solid fa-circle-check" tono="ok" titulo="Solicitud aceptada">
+            La coordinaciÃ³n aprobÃ³ tu proceso. No es posible modificar los datos.
+          </Alerta>
+        )}
+
+        {errorEnvio && (
+          <Alerta icono="fa-solid fa-circle-exclamation" tono="danger">
+            {errorEnvio}
+          </Alerta>
+        )}
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          <TarjetaAlumno profile={profile} />
+
+          <Seccion icono="fa-solid fa-building" titulo="Empresa">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Empresa" required error={errors.empresa?.message}>
+                <TextInput
+                  {...register('empresa')}
+                  placeholder="Ej. Empresa Demo, S.A. de C.V."
+                  disabled={bloqueado}
+                />
+              </FormField>
+              <FormField label="Lugar" required error={errors.lugar?.message}>
+                <TextInput
+                  {...register('lugar')}
+                  placeholder="Ej. Altamira, Tamaulipas"
+                  disabled={bloqueado}
+                />
+              </FormField>
+            </div>
+          </Seccion>
+
+          <Seccion icono="fa-solid fa-user-tie" titulo="Supervisor">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Supervisor" required error={errors.supervisor?.message}>
+                <TextInput
+                  {...register('supervisor')}
+                  placeholder="Ej. Ing. Andrea Morales"
+                  disabled={bloqueado}
+                />
+              </FormField>
+              <FormField label="Puesto del supervisor" required error={errors.puestoSupervisor?.message}>
+                <TextInput
+                  {...register('puestoSupervisor')}
+                  placeholder="Ej. LÃ­der de Proyectos Digitales"
+                  disabled={bloqueado}
+                />
+              </FormField>
+              <FormField label="Correo del supervisor" required error={errors.correoSupervisor?.message}>
+                <TextInput
+                  type="email"
+                  {...register('correoSupervisor')}
+                  placeholder="Ej. supervisor@empresa.com"
+                  disabled={bloqueado}
+                />
+              </FormField>
+            </div>
+            <p className="mt-4 text-xs leading-relaxed text-ink/45">
+              A este correo llegarÃ¡ el enlace temporal para que la empresa complete giro, tamaÃ±o,
+              fechas, horarios y directivo.
+            </p>
+          </Seccion>
+
+          <Seccion
+            icono="fa-solid fa-list-check"
+            titulo="Actividades"
+            accion={
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => append({ valor: '' })}
+                disabled={bloqueado}
+              >
+                <i className="fa-solid fa-plus" aria-hidden="true" />
+                Agregar
+              </button>
+            }
+          >
+            <BloqueActividades
+              fields={fields}
+              registrar={(index) => register(`actividades.${index}.valor`)}
+              onQuitar={remove}
+              errorDe={(index) => errors.actividades?.[index]?.valor?.message}
+              errorLista={errors.actividades?.message}
+              deshabilitado={bloqueado}
+            />
+          </Seccion>
+
+          {!soloLectura && (
+            <div className="card flex flex-wrap items-center justify-between gap-4 p-5">
+              <p className="flex items-start gap-2 text-xs leading-relaxed text-ink/50">
+                <i className="fa-solid fa-circle-info mt-0.5 shrink-0 text-brand" aria-hidden="true" />
+                Al enviar se abre tu proceso y la coordinaciÃ³n confirmarÃ¡ antes de avisar a la empresa.
+              </p>
+              <BotonEnviar isSubmitting={isSubmitting} />
+            </div>
+          )}
+        </form>
+      </div>
     </div>
   )
 }
+
+/* -------------------------------------------------------------------------- */
+/* Avance y cierre: se desbloquean con la carta completa                        */
+/* -------------------------------------------------------------------------- */
 
 function FormularioDocumento({ profile, documento }: { profile: Persona; documento: CodigoDocumento }) {
   const esCarta = documento === 'carta_aceptacion'
@@ -494,10 +534,7 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
     mode: 'onTouched',
   })
 
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'actividades',
-  })
+  const { fields, append, remove } = useFieldArray({ control, name: 'actividades' })
 
   const soloLectura = estado === 'pendiente' || estado === 'aceptada'
   const soloFechasEditables = soloFechas && !soloLectura
@@ -585,28 +622,21 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
   })
 
   if (estado === 'cargando') {
-    return (
-      <div>
-        <Link to="/alumno/documentos" className="btn btn-ghost btn-sm">
-          <i className="fa-solid fa-arrow-left" aria-hidden="true" />
-          Volver a documentos
-        </Link>
-        <p className="quiet field" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span className="spinner spinner-dark" aria-hidden="true" />
-          Verificando tu proceso de prácticas…
-        </p>
-      </div>
-    )
+    return <Cargando icono={ICONOS_DOCUMENTO[documento]} titulo={TITULOS_DOCUMENTO[documento]} />
   }
 
   if (estado === 'no-disponible') {
     return (
-      <MensajeEstado
-        titulo={faltaEmpresa ? 'La empresa aún no completa la carta' : 'Primero solicita la carta de aceptación'}
+      <PantallaDocumento
+        icono="fa-solid fa-circle-info"
+        tono="brand"
+        titulo={
+          faltaEmpresa ? 'La empresa aÃºn no completa la carta' : 'Primero solicita la carta de aceptaciÃ³n'
+        }
         texto={
           faltaEmpresa
-            ? 'La carta está pendiente de confirmación o de los datos de la empresa. Cuando la empresa complete giro, tamaño, fechas, horarios y directivo, podrás solicitar avance y cierre.'
-            : 'Para abrir un proceso de prácticas debes enviar primero tu carta de aceptación. Después podrás solicitar el avance y el cierre con los mismos datos.'
+            ? 'La carta estÃ¡ pendiente de confirmaciÃ³n o de los datos de la empresa. Cuando la empresa complete giro, tamaÃ±o, fechas, horarios y directivo, podrÃ¡s solicitar avance y cierre.'
+            : 'Para abrir un proceso de prÃ¡cticas debes enviar primero tu carta de aceptaciÃ³n. DespuÃ©s podrÃ¡s solicitar el avance y el cierre con los mismos datos.'
         }
       />
     )
@@ -614,293 +644,197 @@ function FormularioDocumento({ profile, documento }: { profile: Persona; documen
 
   if (estado === 'enviada') {
     return (
-      <MensajeEstado
-        exito
+      <PantallaDocumento
+        icono="fa-solid fa-circle-check"
+        tono="ok"
         titulo="Solicitud enviada"
-        texto={`Tu solicitud del proceso ${folio ?? ''} fue enviada correctamente. La coordinación la revisará y podrás consultar el resultado en el panel de documentos.`}
+        texto={`Tu solicitud del proceso ${folio ?? ''} fue enviada correctamente. La coordinaciÃ³n la revisarÃ¡ y podrÃ¡s consultar el resultado en el panel de documentos.`}
       />
     )
   }
 
   return (
     <div>
-      <div className="top">
-        <div className="head-row">
-          <div className="head-icon">
-            <i className={ICONOS_DOCUMENTO[documento]} aria-hidden="true" />
-          </div>
-          <div className="head-text">
-            <h1>{TITULOS_DOCUMENTO[documento]}</h1>
-            <span className="head-sub">
-              {esCarta ? 'Solicitud de documento' : 'Constancia de avance / cierre'}
-            </span>
-          </div>
-        </div>
-        <div className="head-meta">
-          <span className="meta-date">Paso {PASO_DOCUMENTO[documento]} de 3</span>
-          {folio && (
-            <span className="tag">
-              <i className="fa-solid fa-hashtag" aria-hidden="true" />
-              <span style={{ fontFamily: 'var(--font-mono)' }}>{folio}</span>
-            </span>
-          )}
-          <Link to="/alumno/documentos" className="btn btn-ghost btn-sm">
-            Volver
-          </Link>
-        </div>
-      </div>
+      <Encabezado
+        icono={ICONOS_DOCUMENTO[documento]}
+        titulo={TITULOS_DOCUMENTO[documento]}
+        eyebrow={esCarta ? 'Solicitud de documento' : 'Constancia de avance / cierre'}
+        paso={PASO_DOCUMENTO[documento]}
+        folio={folio}
+      />
 
-      {soloLectura && (
-        <div className={`alert ${estado === 'aceptada' ? 'alert-ok' : 'alert-warn'}`}>
-          <i
-            className={estado === 'aceptada' ? 'fa-solid fa-circle-check' : 'fa-solid fa-hourglass-half'}
-            aria-hidden="true"
-          />
-          <span>
-            <strong style={{ display: 'block' }}>
-              {estado === 'aceptada' ? 'Solicitud aceptada' : 'Solicitud en espera de revisión'}
-              {creadoEn ? ` · enviada el ${formatearFecha(creadoEn)}` : ''}
-            </strong>
-            {estado === 'aceptada'
-              ? 'La coordinación aprobó tu solicitud. No es posible modificar los datos.'
-              : 'La coordinación revisará tu solicitud y el resultado aparecerá en tu panel de documentos.'}
-          </span>
-        </div>
-      )}
-
-      {soloFechasEditables && (
-        <div className="alert alert-info">
-          <i className="fa-solid fa-copy" aria-hidden="true" />
-          <span>
-            <strong style={{ display: 'block' }}>Datos copiados de tu carta de aceptación</strong>
-            Solo puedes modificar la fecha de inicio y los horarios.
-          </span>
-        </div>
-      )}
-
-      {errorEnvio && (
-        <div className="error">
-          <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
-          <span>{errorEnvio}</span>
-        </div>
-      )}
-
-      <form onSubmit={onSubmit}>
-        <TarjetaAlumno profile={profile} />
-
-        <section className="card card-pad" style={{ marginTop: 14 }}>
-          <div className="form-card-head">
-            <span className="sec-icon i-empresa">
-              <i className="fa-solid fa-building" aria-hidden="true" />
-            </span>
-            <h2>Empresa</h2>
-          </div>
-          <div className="form-row">
-            <FormField label="Empresa" required error={errors.empresa?.message}>
-              <TextInput
-                {...register('empresa')}
-                placeholder="Ej. Empresa Demo, S.A. de C.V."
-                disabled={!editable('empresa') || isSubmitting}
-              />
-            </FormField>
-            <FormField label="Lugar" required error={errors.lugar?.message}>
-              <TextInput
-                {...register('lugar')}
-                placeholder="Ej. Altamira, Tamaulipas"
-                disabled={!editable('lugar') || isSubmitting}
-              />
-            </FormField>
-            <FormField label="Giro" required error={errors.giro?.message}>
-              <TextInput
-                {...register('giro')}
-                placeholder="Ej. Servicios"
-                disabled={!editable('giro') || isSubmitting}
-              />
-            </FormField>
-            <FormField label="Tipo" required error={errors.tipoOrganizacion?.message}>
-              <Select
-                {...register('tipoOrganizacion')}
-                disabled={!editable('tipoOrganizacion') || isSubmitting}
-              >
-                <option value="Privada">Privada</option>
-                <option value="Pública">Pública</option>
-              </Select>
-            </FormField>
-            <FormField label="Tamaño" required error={errors.tamano?.message}>
-              <Select {...register('tamano')} disabled={!editable('tamano') || isSubmitting}>
-                <option value="Pequeña">Pequeña</option>
-                <option value="Mediana">Mediana</option>
-                <option value="Grande">Grande</option>
-              </Select>
-            </FormField>
-          </div>
-        </section>
-
-        <section className="card card-pad" style={{ marginTop: 14 }}>
-          <div className="form-card-head">
-            <span className="sec-icon i-fechas">
-              <i className="fa-solid fa-calendar-days" aria-hidden="true" />
-            </span>
-            <h2>Fechas y horario</h2>
-          </div>
-          <div className="form-row">
-            <FormField label="Fecha de inicio" required error={errors.fechaInicio?.message}>
-              <TextInput
-                type="date"
-                {...register('fechaInicio')}
-                disabled={!editable('fechaInicio') || isSubmitting}
-              />
-            </FormField>
-            <FormField label="Días" required error={errors.dias?.message}>
-              <TextInput
-                {...register('dias')}
-                placeholder="Ej. lunes a viernes"
-                disabled={!editable('dias') || isSubmitting}
-              />
-            </FormField>
-            <FormField label="Horario de entrada" required error={errors.horarioInicio?.message}>
-              <TextInput
-                type="time"
-                {...register('horarioInicio')}
-                disabled={!editable('horarioInicio') || isSubmitting}
-              />
-            </FormField>
-            <FormField label="Horario de salida" required error={errors.horarioFin?.message}>
-              <TextInput
-                type="time"
-                {...register('horarioFin')}
-                disabled={!editable('horarioFin') || isSubmitting}
-              />
-            </FormField>
-          </div>
-        </section>
-
-        <section className="card card-pad" style={{ marginTop: 14 }}>
-          <div className="form-card-head">
-            <span className="sec-icon i-supervision">
-              <i className="fa-solid fa-user-tie" aria-hidden="true" />
-            </span>
-            <h2>Supervisión y autorización</h2>
-          </div>
-          <div className="form-row">
-            <FormField label="Supervisor" required error={errors.supervisor?.message}>
-              <TextInput
-                {...register('supervisor')}
-                placeholder="Ej. Ing. Andrea Morales"
-                disabled={!editable('supervisor') || isSubmitting}
-              />
-            </FormField>
-            <FormField
-              label="Puesto del supervisor"
-              required
-              error={errors.puestoSupervisor?.message}
-            >
-              <TextInput
-                {...register('puestoSupervisor')}
-                placeholder="Ej. Líder de Proyectos Digitales"
-                disabled={!editable('puestoSupervisor') || isSubmitting}
-              />
-            </FormField>
-            <FormField label="Directivo que autoriza" required error={errors.directivo?.message}>
-              <TextInput
-                {...register('directivo')}
-                placeholder="Ej. Lic. Roberto Martínez"
-                disabled={!editable('directivo') || isSubmitting}
-              />
-            </FormField>
-          </div>
-        </section>
-
-        <section className="card card-pad" style={{ marginTop: 14 }}>
-          <div className="form-card-head">
-            <span className="sec-icon i-actividades">
-              <i className="fa-solid fa-list-check" aria-hidden="true" />
-            </span>
-            <h2>Actividades</h2>
-            <button
-              type="button"
-              className="btn btn-sm accion"
-              onClick={() => append({ valor: '' })}
-              disabled={!editable('actividades') || isSubmitting}
-            >
-              <i className="fa-solid fa-plus" aria-hidden="true" />
-              Agregar
-            </button>
-          </div>
-          <p className="field-hint" style={{ margin: '-6px 0 16px' }}>
-            Describe las actividades que desempeñarás durante tus prácticas.
-          </p>
-
-          <div className="field">
-            {fields.map((field, index) => (
-              <div
-                key={field.id}
-                className="form-row"
-                style={{ alignItems: 'flex-end', marginBottom: 12 }}
-              >
-                <FormField
-                  label={`Actividad ${index + 1}`}
-                  required
-                  error={errors.actividades?.[index]?.valor?.message}
-                >
-                  <TextInput
-                    {...register(`actividades.${index}.valor`)}
-                    placeholder="Ej. Desarrollo y documentación de soluciones digitales"
-                    disabled={!editable('actividades') || isSubmitting}
-                  />
-                </FormField>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => remove(index)}
-                  disabled={fields.length === 1 || !editable('actividades') || isSubmitting}
-                >
-                  <i className="fa-solid fa-xmark" aria-hidden="true" />
-                  Quitar
-                </button>
-              </div>
-            ))}
-          </div>
-          {errors.actividades?.message && (
-            <p className="field-hint" style={{ color: 'var(--danger)', fontWeight: 700 }}>
-              {errors.actividades.message}
-            </p>
-          )}
-        </section>
-
-        {!soloLectura && (
-          <div
-            className="card card-pad field"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 14,
-              flexWrap: 'wrap',
-            }}
+      <div className="space-y-4">
+        {soloLectura && (
+          <Alerta
+            icono={estado === 'aceptada' ? 'fa-solid fa-circle-check' : 'fa-solid fa-hourglass-half'}
+            tono={estado === 'aceptada' ? 'ok' : 'warn'}
+            titulo={`${estado === 'aceptada' ? 'Solicitud aceptada' : 'Solicitud en espera de revisiÃ³n'}${creadoEn ? ` Â· enviada el ${formatearFecha(creadoEn)}` : ''}`}
           >
-            <p className="quiet" style={{ margin: 0, fontSize: '0.8rem' }}>
-              <i className="fa-solid fa-circle-info" aria-hidden="true" />{' '}
-              {esCarta
-                ? 'Al enviar se abre tu proceso de prácticas y la coordinación recibirá un aviso.'
-                : 'Al enviar, la coordinación recibirá este documento para revisión.'}
-            </p>
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <span className="spinner" aria-hidden="true" />
-                  Enviando…
-                </>
-              ) : (
-                <>
-                  <i className="fa-solid fa-paper-plane" aria-hidden="true" />
-                  Enviar solicitud
-                </>
-              )}
-            </button>
-          </div>
+            {estado === 'aceptada'
+              ? 'La coordinaciÃ³n aprobÃ³ tu solicitud. No es posible modificar los datos.'
+              : 'La coordinaciÃ³n revisarÃ¡ tu solicitud y el resultado aparecerÃ¡ en tu panel de documentos.'}
+          </Alerta>
         )}
-      </form>
+
+        {soloFechasEditables && (
+          <Alerta icono="fa-solid fa-copy" tono="info" titulo="Datos copiados de tu carta de aceptaciÃ³n">
+            Solo puedes modificar la fecha de inicio y los horarios.
+          </Alerta>
+        )}
+
+        {errorEnvio && (
+          <Alerta icono="fa-solid fa-circle-exclamation" tono="danger">
+            {errorEnvio}
+          </Alerta>
+        )}
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          <TarjetaAlumno profile={profile} />
+
+          <Seccion icono="fa-solid fa-building" titulo="Empresa">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Empresa" required error={errors.empresa?.message}>
+                <TextInput
+                  {...register('empresa')}
+                  placeholder="Ej. Empresa Demo, S.A. de C.V."
+                  disabled={!editable('empresa') || isSubmitting}
+                />
+              </FormField>
+              <FormField label="Lugar" required error={errors.lugar?.message}>
+                <TextInput
+                  {...register('lugar')}
+                  placeholder="Ej. Altamira, Tamaulipas"
+                  disabled={!editable('lugar') || isSubmitting}
+                />
+              </FormField>
+              <FormField label="Giro" required error={errors.giro?.message}>
+                <TextInput
+                  {...register('giro')}
+                  placeholder="Ej. Servicios"
+                  disabled={!editable('giro') || isSubmitting}
+                />
+              </FormField>
+              <FormField label="Tipo" required error={errors.tipoOrganizacion?.message}>
+                <Select
+                  {...register('tipoOrganizacion')}
+                  disabled={!editable('tipoOrganizacion') || isSubmitting}
+                >
+                  <option value="Privada">Privada</option>
+                  <option value="PÃºblica">PÃºblica</option>
+                </Select>
+              </FormField>
+              <FormField label="TamaÃ±o" required error={errors.tamano?.message}>
+                <Select {...register('tamano')} disabled={!editable('tamano') || isSubmitting}>
+                  <option value="PequeÃ±a">PequeÃ±a</option>
+                  <option value="Mediana">Mediana</option>
+                  <option value="Grande">Grande</option>
+                </Select>
+              </FormField>
+            </div>
+          </Seccion>
+
+          <Seccion icono="fa-solid fa-calendar-days" titulo="Fechas y horario">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Fecha de inicio" required error={errors.fechaInicio?.message}>
+                <TextInput
+                  type="date"
+                  {...register('fechaInicio')}
+                  disabled={!editable('fechaInicio') || isSubmitting}
+                />
+              </FormField>
+              <FormField label="DÃ­as" required error={errors.dias?.message}>
+                <TextInput
+                  {...register('dias')}
+                  placeholder="Ej. lunes a viernes"
+                  disabled={!editable('dias') || isSubmitting}
+                />
+              </FormField>
+              <FormField label="Horario de entrada" required error={errors.horarioInicio?.message}>
+                <TextInput
+                  type="time"
+                  {...register('horarioInicio')}
+                  disabled={!editable('horarioInicio') || isSubmitting}
+                />
+              </FormField>
+              <FormField label="Horario de salida" required error={errors.horarioFin?.message}>
+                <TextInput
+                  type="time"
+                  {...register('horarioFin')}
+                  disabled={!editable('horarioFin') || isSubmitting}
+                />
+              </FormField>
+            </div>
+          </Seccion>
+
+          <Seccion icono="fa-solid fa-user-tie" titulo="SupervisiÃ³n y autorizaciÃ³n">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Supervisor" required error={errors.supervisor?.message}>
+                <TextInput
+                  {...register('supervisor')}
+                  placeholder="Ej. Ing. Andrea Morales"
+                  disabled={!editable('supervisor') || isSubmitting}
+                />
+              </FormField>
+              <FormField
+                label="Puesto del supervisor"
+                required
+                error={errors.puestoSupervisor?.message}
+              >
+                <TextInput
+                  {...register('puestoSupervisor')}
+                  placeholder="Ej. LÃ­der de Proyectos Digitales"
+                  disabled={!editable('puestoSupervisor') || isSubmitting}
+                />
+              </FormField>
+              <FormField label="Directivo que autoriza" required error={errors.directivo?.message}>
+                <TextInput
+                  {...register('directivo')}
+                  placeholder="Ej. Lic. Roberto MartÃ­nez"
+                  disabled={!editable('directivo') || isSubmitting}
+                />
+              </FormField>
+            </div>
+          </Seccion>
+
+          <Seccion
+            icono="fa-solid fa-list-check"
+            titulo="Actividades"
+            accion={
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => append({ valor: '' })}
+                disabled={!editable('actividades') || isSubmitting}
+              >
+<i className="fa-solid fa-plus" aria-hidden="true" />
+                Agregar
+              </button>
+            }
+          >
+            <BloqueActividades
+              fields={fields}
+              registrar={(index) => register(`actividades.${index}.valor`)}
+              onQuitar={remove}
+              errorDe={(index) => errors.actividades?.[index]?.valor?.message}
+              errorLista={errors.actividades?.message}
+              deshabilitado={!editable('actividades') || isSubmitting}
+              hint="Describe las actividades que desempeñarás durante tus prácticas."
+            />
+          </Seccion>
+
+          {!soloLectura && (
+            <div className="card flex flex-wrap items-center justify-between gap-4 p-5">
+              <p className="flex items-start gap-2 text-xs leading-relaxed text-ink/50">
+                <i className="fa-solid fa-circle-info mt-0.5 shrink-0 text-brand" aria-hidden="true" />
+                {esCarta
+                  ? 'Al enviar se abre tu proceso de prÃ¡cticas y la coordinaciÃ³n recibirÃ¡ un aviso.'
+                  : 'Al enviar, la coordinaciÃ³n recibirÃ¡ este documento para revisiÃ³n.'}
+              </p>
+              <BotonEnviar isSubmitting={isSubmitting} />
+            </div>
+          )}
+        </form>
+      </div>
     </div>
   )
 }

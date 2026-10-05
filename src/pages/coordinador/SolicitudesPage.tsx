@@ -1,8 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import Alerta from '../../components/Alerta'
+import DatoCampo from '../../components/DatoCampo'
+import EstadoBadge from '../../components/EstadoBadge'
+import PageHeader from '../../components/PageHeader'
 import { DOCUMENTOS, etiquetaDocumento, ordenDocumento } from '../../lib/documentos'
 import { cartaCompletadaPorEmpresa, correoSupervisorDeCarta } from '../../lib/empresa'
 import { invitarEmpresa } from '../../lib/empresaApi'
+import { formatearFechaCorta, normalizar } from '../../lib/formato'
 import {
   cambiarEstadoProceso,
   listarProcesos,
@@ -13,18 +18,6 @@ import type { DatosDocumentoGuardados } from '../../lib/schemas/documento'
 
 type FiltroEstado = EstadoProceso | 'todas'
 
-const ESTILOS_BADGE: Record<EstadoProceso, string> = {
-  pendiente: 'b-pendiente',
-  aceptada: 'b-atendido',
-  rechazada: 'b-rechazada',
-}
-
-const ETIQUETAS_ESTADO: Record<EstadoProceso, string> = {
-  pendiente: 'Pendiente',
-  aceptada: 'Aceptada',
-  rechazada: 'Rechazada',
-}
-
 const FILTROS: { valor: FiltroEstado; etiqueta: string }[] = [
   { valor: 'todas', etiqueta: 'Todos' },
   { valor: 'pendiente', etiqueta: 'Pendientes' },
@@ -32,92 +25,60 @@ const FILTROS: { valor: FiltroEstado; etiqueta: string }[] = [
   { valor: 'rechazada', etiqueta: 'Rechazados' },
 ]
 
-function formatearFecha(iso: string): string {
-  return new Intl.DateTimeFormat('es-MX', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(iso))
-}
-
-function normalizar(texto: string): string {
-  return texto
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .replace(/_/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
 function claveCarrera(proceso: ProcesoConDocumentos): string {
   return proceso.personas?.carreras ? String(proceso.personas.carreras.id) : 'sin-carrera'
 }
 
-function Dato({ label, valor }: { label: string; valor?: string | null }) {
-  return (
-    <div className="form-group">
-      <span
-        className="field-hint"
-        style={{
-          fontSize: '0.62rem',
-          fontWeight: 900,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-        }}
-      >
-        {label}
-      </span>
-      <span style={{ fontWeight: 700, color: 'var(--ink)' }}>{valor || '—'}</span>
-    </div>
-  )
-}
-
-function BadgeEstado({ estado }: { estado: EstadoProceso }) {
-  return <span className={`badge ${ESTILOS_BADGE[estado]}`}>{ETIQUETAS_ESTADO[estado]}</span>
-}
-
 function SeccionesDatos({ datos }: { datos: Partial<DatosDocumentoGuardados> }) {
+  const actividades = datos.actividades ?? []
+
   return (
-    <>
-      <div className="form-section-label">Empresa</div>
-      <div className="form-row">
-        <Dato label="Empresa" valor={datos.empresa} />
-        <Dato label="Lugar" valor={datos.lugar} />
-        <Dato label="Giro" valor={datos.giro} />
-        <Dato label="Tipo de organización" valor={datos.tipoOrganizacion} />
-        <Dato label="Tamaño" valor={datos.tamano} />
+    <div className="space-y-5">
+      <div>
+        <p className="seccion">Empresa</p>
+        <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          <DatoCampo label="Empresa" valor={datos.empresa} />
+          <DatoCampo label="Lugar" valor={datos.lugar} />
+          <DatoCampo label="Giro" valor={datos.giro} />
+          <DatoCampo label="Tipo de organización" valor={datos.tipoOrganizacion} />
+          <DatoCampo label="Tamaño" valor={datos.tamano} />
+        </div>
       </div>
 
-      <div className="form-section-label">Fechas y horario</div>
-      <div className="form-row">
-        <Dato
-          label="Fecha de inicio"
-          valor={datos.fechaInicio ? formatearFecha(datos.fechaInicio) : null}
-        />
-        <Dato label="Días" valor={datos.dias} />
-        <Dato label="Horario" valor={`${datos.horarioInicio ?? '—'} a ${datos.horarioFin ?? '—'}`} />
+      <div>
+        <p className="seccion">Fechas y horario</p>
+        <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          <DatoCampo
+            label="Fecha de inicio"
+            valor={datos.fechaInicio ? formatearFechaCorta(datos.fechaInicio) : null}
+          />
+          <DatoCampo label="Días" valor={datos.dias} />
+          <DatoCampo label="Horario" valor={`${datos.horarioInicio ?? '—'} a ${datos.horarioFin ?? '—'}`} />
+        </div>
       </div>
 
-      <div className="form-section-label">Supervisión y autorización</div>
-      <div className="form-row">
-        <Dato label="Supervisor" valor={datos.supervisor} />
-        <Dato label="Puesto del supervisor" valor={datos.puestoSupervisor} />
-        <Dato label="Directivo que autoriza" valor={datos.directivo} />
+      <div>
+        <p className="seccion">Supervisión y autorización</p>
+        <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          <DatoCampo label="Supervisor" valor={datos.supervisor} />
+          <DatoCampo label="Puesto del supervisor" valor={datos.puestoSupervisor} />
+          <DatoCampo label="Directivo que autoriza" valor={datos.directivo} />
+        </div>
       </div>
 
-      <div className="form-section-label">Actividades</div>
-      <ol className="form-group" style={{ marginTop: 6, paddingLeft: 20 }}>
-        {(datos.actividades ?? []).map((actividad, index) => (
-          <li key={index} style={{ fontSize: '0.85rem' }}>
-            {actividad}
-          </li>
-        ))}
-        {(datos.actividades ?? []).length === 0 && (
-          <li style={{ color: 'var(--muted)' }}>Sin actividades registradas</li>
+      <div>
+        <p className="seccion">Actividades</p>
+        {actividades.length > 0 ? (
+          <ol className="lista">
+            {actividades.map((actividad, index) => (
+              <li key={index}>{actividad}</li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-sm text-ink/40">Sin actividades registradas</p>
         )}
-      </ol>
-    </>
+      </div>
+    </div>
   )
 }
 
@@ -132,12 +93,7 @@ export default function SolicitudesPage() {
   const [avisoEmpresa, setAvisoEmpresa] = useState<string | null>(null)
   const [errorAccion, setErrorAccion] = useState<string | null>(null)
 
-  const {
-    data: procesos,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
+  const { data: procesos, isLoading, error, refetch } = useQuery({
     queryKey: ['procesos'],
     queryFn: listarProcesos,
   })
@@ -170,13 +126,7 @@ export default function SolicitudesPage() {
           normalizar(etiquetaDocumento(solicitud.documento)).includes(consulta) ||
           normalizar(solicitud.documento).includes(consulta),
       )
-      return (
-        nombre.includes(consulta) ||
-        correo.includes(consulta) ||
-        id.includes(consulta) ||
-        folio.includes(consulta) ||
-        documentos
-      )
+      return nombre.includes(consulta) || correo.includes(consulta) || id.includes(consulta) || folio.includes(consulta) || documentos
     })
   }, [porCarrera, busqueda])
 
@@ -216,7 +166,7 @@ export default function SolicitudesPage() {
     try {
       const expira = await invitarEmpresa(proceso.id, reenviar)
       setAvisoEmpresa(
-        `Enlace ${reenviar ? 'reenviado' : 'enviado'} a la empresa. Vence el ${formatearFecha(expira)}.`,
+        `Enlace ${reenviar ? 'reenviado' : 'enviado'} a la empresa. Vence el ${formatearFechaCorta(expira)}.`,
       )
       await queryClient.invalidateQueries({ queryKey: ['procesos'] })
       const frescos = queryClient.getQueryData<ProcesoConDocumentos[]>(['procesos'])
@@ -258,7 +208,7 @@ export default function SolicitudesPage() {
 
     return (
       <div>
-        <div className="top">
+        <div className="mb-4">
           <button
             type="button"
             className="btn btn-ghost btn-sm"
@@ -271,207 +221,230 @@ export default function SolicitudesPage() {
             <i className="fa-solid fa-arrow-left" aria-hidden="true" />
             Volver a la lista
           </button>
-          <div className="head-meta">
-            <span className="tag">
-              <i className="fa-solid fa-hashtag" aria-hidden="true" />
-              <span style={{ fontFamily: 'var(--font-mono)' }}>{seleccionada.folio}</span>
-            </span>
-            <BadgeEstado estado={seleccionada.estado} />
-          </div>
         </div>
 
-        <div className="head-row">
-          <div className="head-icon">
-            <i className="fa-solid fa-user-graduate" aria-hidden="true" />
-          </div>
-          <div className="head-text">
-            <h1>Proceso de prácticas</h1>
-            <span className="head-sub">
-              Periodo {seleccionada.periodo} · abierto el {formatearFecha(seleccionada.creado_en)}
-            </span>
-          </div>
-        </div>
+        <PageHeader
+          icono="fa-solid fa-user-graduate"
+          titulo="Proceso de prácticas"
+          eyebrow={`Periodo ${seleccionada.periodo} · abierto el ${formatearFechaCorta(seleccionada.creado_en)}`}
+          meta={
+            <>
+              <span className="etiqueta">
+                <i className="fa-solid fa-hashtag" aria-hidden="true" />
+                <span className="font-mono">{seleccionada.folio}</span>
+              </span>
+              <EstadoBadge estado={seleccionada.estado} />
+            </>
+          }
+        />
 
-        <section className="card card-pad" style={{ marginTop: 16 }}>
-          <div className="form-card-head">
-            <h2>Alumno</h2>
-          </div>
-          <div className="form-row">
-            <Dato label="Nombre" valor={seleccionada.personas?.nombre} />
-            <Dato label="ID" valor={seleccionada.alumno_id} />
-            <Dato label="Carrera" valor={carrera ? carrera.nombre : '—'} />
-            <Dato label="Correo" valor={seleccionada.personas?.correo} />
-          </div>
-        </section>
-
-        {documentos.map((solicitud) => (
-          <section key={solicitud.id} className="card card-pad" style={{ marginTop: 14 }}>
-            <div className="form-card-head">
-              <h2>{etiquetaDocumento(solicitud.documento)}</h2>
-              <span className="meta-date">Enviada el {formatearFecha(solicitud.creado_en)}</span>
+        <div className="space-y-4">
+          <section className="card p-5 sm:p-6">
+            <div className="mb-5 flex items-center gap-2.5 border-b border-line pb-3.5">
+              <i className="fa-solid fa-id-card text-base text-brand" aria-hidden="true" />
+              <h2 className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-ink">
+                Alumno
+              </h2>
             </div>
-            <SeccionesDatos datos={solicitud.datos as Partial<DatosDocumentoGuardados>} />
+            <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+              <DatoCampo label="Nombre" valor={seleccionada.personas?.nombre} />
+              <DatoCampo label="ID" valor={seleccionada.alumno_id} />
+              <DatoCampo label="Carrera" valor={carrera ? carrera.nombre : null} />
+              <DatoCampo label="Correo" valor={seleccionada.personas?.correo} />
+            </div>
           </section>
-        ))}
 
-        {faltantes.length > 0 && (
-          <div className="alert alert-warn" style={{ marginTop: 14 }}>
-            <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
-            <span>
+          {documentos.map((solicitud) => (
+            <section key={solicitud.id} className="card p-5 sm:p-6">
+              <div className="mb-5 flex flex-wrap items-center gap-3 border-b border-line pb-3.5">
+                <i className="fa-solid fa-file-lines text-base text-brand" aria-hidden="true" />
+                <h2 className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-ink">
+                  {etiquetaDocumento(solicitud.documento)}
+                </h2>
+                <span className="ml-auto text-xs font-semibold text-ink/40">
+                  Enviada el {formatearFechaCorta(solicitud.creado_en)}
+                </span>
+              </div>
+              <SeccionesDatos datos={solicitud.datos as Partial<DatosDocumentoGuardados>} />
+            </section>
+          ))}
+
+          {faltantes.length > 0 && (
+            <Alerta icono="fa-solid fa-triangle-exclamation" tono="warn">
               Faltan {faltantes.length} documento(s): {faltantes.map((doc) => doc.titulo).join(', ')}.
               El alumno puede seguir agregándolos.
-            </span>
-          </div>
-        )}
+            </Alerta>
+          )}
 
-        <section className="card card-pad" style={{ marginTop: 14 }}>
-          <div className="form-card-head">
-            <h2>Empresa</h2>
-            <span className="meta-date">{estadoEmpresa}</span>
-          </div>
-          <div className="form-row">
-            <Dato label="Correo del supervisor" valor={correoEmpresa ?? seleccionada.empresa_correo} />
-            <Dato
-              label="Vence el enlace"
-              valor={seleccionada.empresa_expira_en ? formatearFecha(seleccionada.empresa_expira_en) : null}
-            />
-            <Dato
-              label="Completada"
-              valor={seleccionada.empresa_completada_en ? formatearFecha(seleccionada.empresa_completada_en) : null}
-            />
-          </div>
-          {!resuelta && carta && !cartaLista && (
-            <div className="field" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => void manejarInvitacion(seleccionada, false)}
-                disabled={invitePendiente || !correoEmpresa}
-              >
-                {invitePendiente ? (
-                  <>
-                    <span className="spinner" aria-hidden="true" />
-                    Enviando…
-                  </>
-                ) : (
-                  <>
-                    <i className="fa-solid fa-paper-plane" aria-hidden="true" />
-                    Confirmar y enviar a empresa
-                  </>
-                )}
-              </button>
-              {seleccionada.empresa_estado === 'enviada' && (
+          <section className="card p-5 sm:p-6">
+            <div className="mb-5 flex flex-wrap items-center gap-3 border-b border-line pb-3.5">
+              <i className="fa-solid fa-building text-base text-brand" aria-hidden="true" />
+              <h2 className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-ink">Empresa</h2>
+              <span className="ml-auto text-xs font-semibold text-ink/40">{estadoEmpresa}</span>
+            </div>
+            <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+              <DatoCampo
+                label="Correo del supervisor"
+                valor={correoEmpresa ?? seleccionada.empresa_correo}
+              />
+              <DatoCampo
+                label="Vence el enlace"
+                valor={
+                  seleccionada.empresa_expira_en
+                    ? formatearFechaCorta(seleccionada.empresa_expira_en)
+                    : null
+                }
+              />
+              <DatoCampo
+                label="Completada"
+                valor={
+                  seleccionada.empresa_completada_en
+                    ? formatearFechaCorta(seleccionada.empresa_completada_en)
+                    : null
+                }
+              />
+            </div>
+
+            {!resuelta && carta && !cartaLista && (
+              <>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => void manejarInvitacion(seleccionada, false)}
+                    disabled={invitePendiente || !correoEmpresa}
+                  >
+                    {invitePendiente ? (
+                      <>
+                        <span className="spinner" aria-hidden="true" />
+                        Enviando…
+                      </>
+                    ) : (
+                      <>
+                        <i className="fa-solid fa-paper-plane" aria-hidden="true" />
+                        Confirmar y enviar a empresa
+                      </>
+                    )}
+                  </button>
+                  {seleccionada.empresa_estado === 'enviada' && (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => void manejarInvitacion(seleccionada, true)}
+                      disabled={invitePendiente || !correoEmpresa}
+                    >
+                      <i className="fa-solid fa-rotate-right" aria-hidden="true" />
+                      Reenviar enlace
+                    </button>
+                  )}
+                </div>
+                <p className="mt-3 text-xs leading-relaxed text-ink/45">
+                  La confirmación solo envía el enlace temporal a la empresa; no acepta el proceso.
+                </p>
+              </>
+            )}
+
+            {avisoEmpresa && (
+              <Alerta icono="fa-solid fa-circle-check" tono="ok" className="mt-4">
+                {avisoEmpresa}
+              </Alerta>
+            )}
+          </section>
+
+          {!resuelta && (
+            <section className="card p-5 sm:p-6">
+              <div className="mb-5 flex items-center gap-2.5 border-b border-line pb-3.5">
+                <i className="fa-solid fa-gavel text-base text-brand" aria-hidden="true" />
+                <h2 className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-ink">
+                  Acciones
+                </h2>
+              </div>
+              <p className="text-sm leading-relaxed text-ink/55">
+                Al aceptar o rechazar, el resultado se aplica a los {DOCUMENTOS.length} documentos del
+                alumno en este periodo.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className="btn"
-                  onClick={() => void manejarInvitacion(seleccionada, true)}
-                  disabled={invitePendiente || !correoEmpresa}
+                  className="btn btn-ok"
+                  onClick={() => void manejarAccion(seleccionada, 'aceptada')}
+                  disabled={accionPendiente !== null || !puedeAceptar}
                 >
-                  <i className="fa-solid fa-rotate-right" aria-hidden="true" />
-                  Reenviar enlace
+                  {accionPendiente === seleccionada.id ? (
+                    <>
+                      <span className="spinner" aria-hidden="true" />
+                      Procesando…
+                    </>
+                  ) : (
+                    <>
+                      <i className="fa-solid fa-check" aria-hidden="true" />
+                      Aceptar proceso
+                    </>
+                  )}
                 </button>
-              )}
-            </div>
-          )}
-          {!resuelta && (
-            <p className="quiet" style={{ fontSize: '0.8rem', marginBottom: 0 }}>
-              La confirmación solo envía el enlace temporal a la empresa; no acepta el proceso.
-            </p>
-          )}
-          {avisoEmpresa && (
-            <div className="alert alert-ok" style={{ marginTop: 12 }}>
-              <i className="fa-solid fa-circle-check" aria-hidden="true" />
-              <span>{avisoEmpresa}</span>
-            </div>
-          )}
-        </section>
-
-        {!resuelta && (
-          <section className="card card-pad" style={{ marginTop: 14 }}>
-            <div className="form-card-head">
-              <h2>Acciones</h2>
-            </div>
-            <p className="quiet" style={{ fontSize: '0.82rem' }}>
-              Al aceptar o rechazar, el resultado se aplica a los {DOCUMENTOS.length} documentos
-              del alumno en este periodo.
-            </p>
-            <div className="field" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn btn-ok"
-                onClick={() => void manejarAccion(seleccionada, 'aceptada')}
-                disabled={accionPendiente !== null || !puedeAceptar}
-              >
-                {accionPendiente === seleccionada.id ? (
-                  <>
-                    <span className="spinner" aria-hidden="true" />
-                    Procesando…
-                  </>
-                ) : (
-                  <>
-                    <i className="fa-solid fa-check" aria-hidden="true" />
-                    Aceptar proceso
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger-solid"
-                onClick={() => void manejarAccion(seleccionada, 'rechazada')}
-                disabled={accionPendiente !== null}
-              >
-                <i className="fa-solid fa-xmark" aria-hidden="true" />
-                Rechazar proceso
-              </button>
-            </div>
-            {!puedeAceptar && (
-              <div className="alert alert-warn" style={{ marginTop: 14 }}>
-                <i className="fa-solid fa-circle-info" aria-hidden="true" />
-                <span>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={() => void manejarAccion(seleccionada, 'rechazada')}
+                  disabled={accionPendiente !== null}
+                >
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                  Rechazar proceso
+                </button>
+              </div>
+              {!puedeAceptar && (
+                <Alerta
+                  icono="fa-solid fa-circle-info"
+                  tono="warn"
+                  className="mt-4"
+                >
                   Para aceptar se requieren los {DOCUMENTOS.length} documentos y la carta completada
                   por la empresa. Faltan {DOCUMENTOS.length - documentos.length} documento(s)
                   {!cartaLista ? ' y la carta de la empresa' : ''}.
-                </span>
-              </div>
-            )}
-            {errorAccion && (
-              <div className="error">
-                <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
-                <span>{errorAccion}</span>
-              </div>
-            )}
-          </section>
-        )}
+                </Alerta>
+              )}
+              {errorAccion && (
+                <Alerta icono="fa-solid fa-circle-exclamation" tono="danger" className="mt-4">
+                  {errorAccion}
+                </Alerta>
+              )}
+            </section>
+          )}
+        </div>
       </div>
     )
   }
 
   return (
     <div>
-      <div className="top">
-        <div className="head-row">
-          <div className="head-icon">
-            <i className="fa-solid fa-clipboard-list" aria-hidden="true" />
-          </div>
-          <div className="head-text">
-            <h1>Procesos de prácticas</h1>
-            <span className="head-sub">Panel del coordinador</span>
-          </div>
-        </div>
-        <div className="head-meta">
-          <span className="meta-date">{procesos?.length ?? 0} procesos</span>
-        </div>
-      </div>
+      <PageHeader
+        icono="fa-solid fa-clipboard-list"
+        titulo="Procesos de prácticas"
+        eyebrow="Panel del coordinador"
+        meta={<span className="etiqueta">{procesos?.length ?? 0} procesos</span>}
+      />
 
-      <div className="filters">
-        <input
-          type="search"
-          value={busqueda}
-          onChange={(evento) => setBusqueda(evento.target.value)}
-          placeholder="Buscar por nombre, correo, ID, folio o documento…"
-          aria-label="Buscar alumno"
-        />
-        <select value={filtroCarrera} onChange={(evento) => setFiltroCarrera(evento.target.value)}>
+      <div className="mb-5 grid gap-3 sm:grid-cols-[1.6fr_0.8fr]">
+        <div className="relative">
+          <i
+            className="fa-solid fa-magnifying-glass pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-ink/30"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            className="campo pl-9"
+            value={busqueda}
+            onChange={(evento) => setBusqueda(evento.target.value)}
+            placeholder="Buscar por nombre, correo, ID, folio o documento…"
+            aria-label="Buscar alumno"
+          />
+        </div>
+        <select
+          className="campo"
+          value={filtroCarrera}
+          onChange={(evento) => setFiltroCarrera(evento.target.value)}
+          aria-label="Filtrar por carrera"
+        >
           <option value="todas">Todas las carreras</option>
           {carreras.map(([clave, nombre]) => (
             <option key={clave} value={clave}>
@@ -481,36 +454,41 @@ export default function SolicitudesPage() {
         </select>
       </div>
 
-      <div className="seg-control" style={{ marginBottom: 16 }}>
+      <div className="mb-6 flex flex-wrap gap-2">
         {FILTROS.map((filtro) => {
           const activo = filtroEstado === filtro.valor
           return (
             <button
               key={filtro.valor}
               type="button"
-              className={`seg${activo ? ' active' : ''}`}
               onClick={() => setFiltroEstado(filtro.valor)}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-bold tracking-[0.04em] uppercase transition ${
+                activo
+                  ? 'bg-ink text-white'
+                  : 'bg-white text-ink/55 ring-1 ring-line hover:text-ink'
+              }`}
             >
-              {filtro.etiqueta} ({conteos[filtro.valor]})
+              {filtro.etiqueta}{' '}
+              <span className={activo ? 'text-white/55' : 'text-ink/30'}>
+                ({conteos[filtro.valor]})
+              </span>
             </button>
           )
         })}
       </div>
 
       {isLoading && (
-        <div className="alert alert-info">
-          <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" />
-          <span>Cargando procesos…</span>
-        </div>
+        <Alerta icono="fa-solid fa-spinner fa-spin" tono="info">
+          Cargando procesos…
+        </Alerta>
       )}
 
       {error && (
-        <div className="card card-pad">
-          <div className="error" style={{ marginBottom: 0 }}>
-            <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
-            <span>No se pudieron cargar los procesos.</span>
-          </div>
-          <button type="button" className="btn" onClick={() => void refetch()}>
+        <div className="card p-5">
+          <Alerta icono="fa-solid fa-circle-exclamation" tono="danger">
+            No se pudieron cargar los procesos.
+          </Alerta>
+          <button type="button" className="btn btn-outline mt-4" onClick={() => void refetch()}>
             <i className="fa-solid fa-rotate-right" aria-hidden="true" />
             Reintentar
           </button>
@@ -519,26 +497,33 @@ export default function SolicitudesPage() {
 
       {!isLoading && !error && (procesos ?? []).length === 0 && (
         <div className="card">
-          <div className="empty-state">
-            <i className="fa-solid fa-inbox" aria-hidden="true" />
-            <strong>Todavía no se han abierto procesos</strong>
-            <span>Cuando un alumno solicite su carta de aceptación aparecerá aquí.</span>
+          <div className="flex flex-col items-center gap-2 px-6 py-14 text-center">
+            <i className="fa-solid fa-inbox text-3xl text-ink/20" aria-hidden="true" />
+            <strong className="text-sm font-bold text-ink">Todavía no se han abierto procesos</strong>
+            <span className="text-sm text-ink/45">
+              Cuando un alumno solicite su carta de aceptación aparecerá aquí.
+            </span>
           </div>
         </div>
       )}
 
       {!isLoading && !error && (procesos ?? []).length > 0 && filtradas.length === 0 && (
         <div className="card">
-          <div className="empty-state">
-            <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
-            <strong>Sin resultados</strong>
-            <span>No hay procesos que coincidan con los filtros seleccionados.</span>
+          <div className="flex flex-col items-center gap-2 px-6 py-14 text-center">
+            <i
+              className="fa-solid fa-magnifying-glass text-3xl text-ink/20"
+              aria-hidden="true"
+            />
+            <strong className="text-sm font-bold text-ink">Sin resultados</strong>
+            <span className="text-sm text-ink/45">
+              No hay procesos que coincidan con los filtros seleccionados.
+            </span>
           </div>
         </div>
       )}
 
       {!isLoading && !error && filtradas.length > 0 && (
-        <div className="table-wrap">
+        <div className="tabla-envoltura">
           <table>
             <thead>
               <tr>
@@ -557,31 +542,35 @@ export default function SolicitudesPage() {
                 return (
                   <tr key={proceso.id}>
                     <td data-label="Folio">
-                      <span className="td-folio">{proceso.folio}</span>
+                      <span className="font-mono text-xs font-bold text-ink">
+                        {proceso.folio}
+                      </span>
                     </td>
                     <td data-label="Alumno">
-                      <span className="td-id">{proceso.personas?.nombre ?? '—'}</span>
-                      <span className="td-fecha">
+                      <span className="block font-semibold text-ink">
+                        {proceso.personas?.nombre ?? '—'}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-ink/45">
                         ID {proceso.alumno_id}
                         {proceso.personas?.correo ? ` · ${proceso.personas.correo}` : ''}
                       </span>
                     </td>
-                    <td data-label="Carrera">
+                    <td data-label="Carrera" className="font-medium">
                       {carrera ? carrera.sigla || carrera.nombre : '—'}
                     </td>
-                    <td data-label="Documentos">
+                    <td data-label="Documentos" className="font-semibold tabular-nums">
                       {proceso.solicitudes.length}/{DOCUMENTOS.length}
                     </td>
-                    <td data-label="Fecha">
-                      <span className="td-fecha">{formatearFecha(proceso.creado_en)}</span>
+                    <td data-label="Fecha" className="text-xs text-ink/50 tabular-nums">
+                      {formatearFechaCorta(proceso.creado_en)}
                     </td>
                     <td data-label="Estado">
-                      <BadgeEstado estado={proceso.estado} />
+                      <EstadoBadge estado={proceso.estado} />
                     </td>
                     <td>
                       <button
                         type="button"
-                        className="row-btn row-edit"
+                        className="btn btn-outline btn-sm"
                         onClick={() => {
                           setSeleccionada(proceso)
                           setErrorAccion(null)
